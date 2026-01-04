@@ -1,4 +1,4 @@
-import type { ExtractedStyle } from '../pipeline/extract/types';
+import type { NormalizedStyle } from '../pipeline/normalize/types';
 
 /*
  * 핵심 타입 필터
@@ -8,7 +8,7 @@ export type ExtractNodeType = Extract<SceneNode['type'], 'FRAME' | 'INSTANCE' | 
 /*
  * 모든 React-like 노드가 공유하는 기본 props
  */
-export interface BaseNodeProps<TSTyle = ExtractedStyle> {
+export interface BaseNodeProps<TSTyle = NormalizedStyle> {
 	id: string;
 	name: string;
 	style?: TSTyle;

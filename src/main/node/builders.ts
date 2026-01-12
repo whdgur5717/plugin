@@ -9,41 +9,34 @@ import type {
 	TextReactNode,
 } from './type';
 
-export const buildTextNode = (node: TextNode): TextReactNode => ({
+export const buildTextNode = async (node: TextNode): Promise<TextReactNode> => ({
 	type: 'TEXT',
-	...buildNodeData(node),
+	...(await buildNodeData(node)),
 });
 
-export const buildFrameNode = (node: FrameNode): FrameReactNode => ({
+export const buildFrameNode = async (node: FrameNode): Promise<FrameReactNode> => ({
 	type: 'FRAME',
-	...buildNodeData(node),
+	...(await buildNodeData(node)),
 });
 
-export const buildInstanceNode = (node: InstanceNode): InstanceReactNode => {
-	const data = buildNodeData(node);
-	return {
-		type: 'INSTANCE',
-		...data,
-		props: {
-			...data.props,
-			componentProperties: node.componentProperties,
-		},
-	};
-};
+export const buildInstanceNode = async (node: InstanceNode): Promise<InstanceReactNode> => ({
+	type: 'INSTANCE',
+	...(await buildNodeData(node)),
+});
 
-export const buildGroupNode = (node: GroupNode): GroupReactNode => ({
+export const buildGroupNode = async (node: GroupNode): Promise<GroupReactNode> => ({
 	type: 'GROUP',
-	...buildNodeData(node),
+	...(await buildNodeData(node)),
 });
 
-export const buildRectangleNode = (node: RectangleNode): RectangleReactNode => ({
+export const buildRectangleNode = async (node: RectangleNode): Promise<RectangleReactNode> => ({
 	type: 'RECTANGLE',
-	...buildNodeData(node),
+	...(await buildNodeData(node)),
 });
 
-export const buildGenericNode = (
+export const buildGenericNode = async (
 	node: Extract<SceneNode, { type: Exclude<SceneNode['type'], ExtractNodeType> }>,
-): GenericReactNode => ({
+): Promise<GenericReactNode> => ({
 	type: node.type,
-	...buildNodeData(node),
+	...(await buildNodeData(node)),
 });

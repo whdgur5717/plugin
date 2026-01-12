@@ -1,16 +1,63 @@
 import type { ExtractedBoundVariables } from '../pipeline/extract/types';
 import type { IRAssetRef, IRInstanceRef, IRTokenRef } from '../pipeline/ir/types';
-import type { NormalizedStyle } from '../pipeline/normalize/types';
+import type {
+	NormalizedEffect,
+	NormalizedFill,
+	NormalizedLayout,
+	NormalizedStyle,
+	NormalizedStroke,
+	NormalizedText,
+	TokenRef,
+	TokenizedValue,
+} from '../pipeline/normalize/types';
 
 /*
  * 핵심 타입 필터
  */
 export type ExtractNodeType = Extract<SceneNode['type'], 'FRAME' | 'INSTANCE' | 'GROUP' | 'TEXT' | 'RECTANGLE'>;
 
+type RowsColsLayoutGrid = Extract<LayoutGrid, { pattern: 'ROWS' | 'COLUMNS' }>;
+
+export type OutputLayoutGrid = {
+	pattern: LayoutGrid['pattern'];
+	alignment?: RowsColsLayoutGrid['alignment'];
+	gutterSize?: TokenizedValue<number>;
+	count?: TokenizedValue<number>;
+	sectionSize?: TokenizedValue<number>;
+	offset?: TokenizedValue<number>;
+	visible?: boolean;
+	color?: RGBA;
+	tokenRef?: TokenRef;
+};
+
+export type OutputNormalizedLayout = NormalizedLayout & {
+	layoutGrids?: OutputLayoutGrid[];
+};
+
+export type OutputNormalizedStroke = Omit<NormalizedStroke, 'paints'> & {
+	paints: Array<TokenizedValue<NormalizedFill>>;
+};
+
+export type OutputNormalizedStyle = Omit<NormalizedStyle, 'fills' | 'effects' | 'stroke' | 'layout'> & {
+	fills: Array<TokenizedValue<NormalizedFill>>;
+	effects: Array<TokenizedValue<NormalizedEffect>>;
+	stroke: OutputNormalizedStroke | null;
+	layout: OutputNormalizedLayout;
+	text: NormalizedText | null;
+	visible?: TokenizedValue<boolean>;
+	opacity?: TokenizedValue<number>;
+};
+
+export type OutputComponentProperties = {
+	[propertyName: string]: Omit<ComponentProperties[string], 'value'> & {
+		value: TokenizedValue<ComponentProperties[string]['value']>;
+	};
+};
+
 /*
  * 모든 React-like 노드가 공유하는 기본 props
  */
-export interface BaseNodeProps<TSTyle = NormalizedStyle> {
+export interface BaseNodeProps<TSTyle = OutputNormalizedStyle> {
 	id: string;
 	name: string;
 	style?: TSTyle;
@@ -37,7 +84,7 @@ export interface BaseReactNode<
  * 노드별 props
  */
 export type InstanceNodeProps = BaseNodeProps & {
-	componentProperties?: ComponentProperties;
+	componentProperties?: OutputComponentProperties;
 };
 
 /*

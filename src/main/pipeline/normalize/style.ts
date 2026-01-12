@@ -7,7 +7,7 @@ import type { ExtractedStyle } from '../extract/types';
 import type { NormalizedStyle } from './types';
 
 export const normalizeStyle = (style: ExtractedStyle): NormalizedStyle => ({
-	fills: normalizeFills(style.fills),
+	fills: normalizeFills(style.fills, style.nodeType),
 	effects: normalizeEffects(style.effects),
 	layout: normalizeLayout(style.layout, style.nodeBoundVariables),
 	text: normalizeText(style.text, style.nodeBoundVariables),

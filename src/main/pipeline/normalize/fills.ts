@@ -2,11 +2,11 @@ import type { ExtractedFillProps } from '../extract/fills';
 import type {
 	NormalizedColor,
 	NormalizedFill,
-	NormalizedFills,
 	NormalizedGradientFill,
 	NormalizedGradientStop,
 	NormalizedImageFill,
 	NormalizedSolidFill,
+	NormalizedValue,
 	TokenizedValue,
 } from './types';
 
@@ -158,8 +158,8 @@ const normalizePaint = (paint: Paint): NormalizedFill | null => {
 	return null;
 };
 
-export const normalizePaints = (paints: ReadonlyArray<Paint> | PluginAPI['mixed'] | undefined): NormalizedFill[] => {
-	if (!paints || paints === figma.mixed || !Array.isArray(paints)) {
+export const normalizePaints = (paints: ReadonlyArray<Paint> | undefined): NormalizedFill[] => {
+	if (!paints || !Array.isArray(paints)) {
 		return [];
 	}
 
@@ -174,4 +174,18 @@ export const normalizePaints = (paints: ReadonlyArray<Paint> | PluginAPI['mixed'
 	return normalized;
 };
 
-export const normalizeFills = (props: ExtractedFillProps): NormalizedFills => normalizePaints(props.fills);
+export const normalizeFills = (
+	props: ExtractedFillProps,
+	nodeType?: string,
+): NormalizedValue<NormalizedFill[]> => {
+	const fills = props.fills;
+
+	if (fills === figma.mixed) {
+		if (nodeType !== 'TEXT') {
+			console.warn('Unexpected mixed fills on non-TEXT node');
+		}
+		return { type: 'mixed', values: [] };
+	}
+
+	return { type: 'uniform', value: normalizePaints(fills) };
+};

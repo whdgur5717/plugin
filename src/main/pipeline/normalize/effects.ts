@@ -3,11 +3,11 @@ import type {
 	NormalizedBlurEffect,
 	NormalizedColor,
 	NormalizedEffect,
-	NormalizedEffects,
 	NormalizedGlassEffect,
 	NormalizedNoiseEffect,
 	NormalizedShadowEffect,
 	NormalizedTextureEffect,
+	NormalizedValue,
 	TokenizedValue,
 } from './types';
 
@@ -138,16 +138,24 @@ const normalizeEffect = (effect: Effect): NormalizedEffect | null => {
 	}
 };
 
-export const normalizeEffects = (props: ExtractedEffectProps): NormalizedEffects => {
+export const normalizeEffects = (props: ExtractedEffectProps): NormalizedValue<NormalizedEffect[]> => {
 	const effects = props.effects;
-	if (!effects || !Array.isArray(effects)) return [];
 
-	const normalized: NormalizedEffects = [];
+	if (effects === figma.mixed) {
+		console.warn('Unexpected mixed effects on single node');
+		return { type: 'mixed', values: [] };
+	}
+
+	if (!effects || !Array.isArray(effects)) {
+		return { type: 'uniform', value: [] };
+	}
+
+	const normalized: NormalizedEffect[] = [];
 	for (let index = 0; index < effects.length; index += 1) {
 		const effect = effects[index];
 		const normalizedEffect = normalizeEffect(effect);
 		if (normalizedEffect) normalized.push(normalizedEffect);
 	}
 
-	return normalized;
+	return { type: 'uniform', value: normalized };
 };

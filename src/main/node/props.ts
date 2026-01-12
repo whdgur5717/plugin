@@ -1,7 +1,6 @@
 import type { ExtractedBoundVariables, ExtractedStyle } from '../pipeline/extract/types';
 import { extractStyle } from '../pipeline/extract/style';
 import type { ExtractedTextProps } from '../pipeline/extract/text';
-import type { IRAssetRef, IRInstanceRef, IRTokenRef } from '../pipeline/ir/types';
 import { normalizeStyle } from '../pipeline/normalize/style';
 import type {
 	NormalizedEffect,
@@ -14,21 +13,25 @@ import type {
 	TokenRef,
 	TokenizedValue,
 } from '../pipeline/normalize/types';
+import { tokenizedValueSchema, variableAliasSchema } from '../pipeline/shared/schemas';
 import { VariableRegistry } from '../pipeline/variables/registry';
 import type {
+	AssetRef,
 	BaseNodeProps,
+	InstanceRef,
 	OutputComponentProperties,
 	OutputLayoutGrid,
 	OutputNormalizedLayout,
 	OutputNormalizedStroke,
 	OutputNormalizedStyle,
+	TokenRefMapping,
 } from './type';
 
 type BuiltNodeData = {
 	props: BaseNodeProps;
-	instanceRef?: IRInstanceRef;
-	tokensRef?: IRTokenRef[];
-	assets?: IRAssetRef[];
+	instanceRef?: InstanceRef;
+	tokensRef?: TokenRefMapping[];
+	assets?: AssetRef[];
 };
 
 type TextSegment = NonNullable<ExtractedTextProps['characters']>[number];
@@ -37,26 +40,19 @@ export type BoundVariablesRecord = Record<string, unknown> | undefined;
 
 const variableRegistry = new VariableRegistry();
 
-const isVariableAlias = (value: unknown): value is VariableAlias =>
-	!!value &&
-	typeof value === 'object' &&
-	'type' in value &&
-	'id' in value &&
-	(value as { type?: unknown }).type === 'VARIABLE_ALIAS' &&
-	typeof (value as { id?: unknown }).id === 'string';
-
-const isTokenizedValue = <T>(value: TokenizedValue<T>): value is { tokenRef: TokenRef; fallback: T } =>
-	!!value && typeof value === 'object' && 'tokenRef' in value && 'fallback' in value;
-
-const unwrapTokenized = <T>(value: TokenizedValue<T>): T => (isTokenizedValue(value) ? value.fallback : value);
+const unwrapTokenized = <T>(value: TokenizedValue<T>): T => {
+	const parsed = tokenizedValueSchema.safeParse(value);
+	return parsed.success ? (parsed.data.fallback as T) : (value as T);
+};
 
 const resolveTokenRef = (tokenRef: TokenRef, tokenRefs: Map<string, TokenRef>): TokenRef =>
 	tokenRefs.get(tokenRef.id) ?? tokenRef;
 
 const resolveTokenizedValue = <T>(value: TokenizedValue<T>, tokenRefs: Map<string, TokenRef>): TokenizedValue<T> => {
-	if (!isTokenizedValue(value)) return value;
-	const tokenRef = resolveTokenRef(value.tokenRef, tokenRefs);
-	return tokenRef === value.tokenRef ? value : { tokenRef, fallback: value.fallback };
+	const parsed = tokenizedValueSchema.safeParse(value);
+	if (!parsed.success) return value;
+	const tokenRef = resolveTokenRef(parsed.data.tokenRef as TokenRef, tokenRefs);
+	return tokenRef === parsed.data.tokenRef ? value : { tokenRef, fallback: parsed.data.fallback as T };
 };
 
 const toTokenizedValue = <T>(
@@ -75,7 +71,8 @@ const applyAliasToken = <T>(
 	tokenRefs: Map<string, TokenRef>,
 ): TokenizedValue<T> => {
 	if (alias) {
-		const fallback = isTokenizedValue(value) ? value.fallback : value;
+		const parsed = tokenizedValueSchema.safeParse(value);
+		const fallback = parsed.success ? (parsed.data.fallback as T) : (value as T);
 		return toTokenizedValue(fallback, alias, tokenRefs);
 	}
 	return resolveTokenizedValue(value, tokenRefs);
@@ -94,17 +91,17 @@ const applyAliasTokenOptional = <T>(
 ): TokenizedValue<T> | null => (value === null ? null : applyAliasToken(value, alias, tokenRefs));
 
 const getAlias = (record: BoundVariablesRecord, key: string): VariableAlias | null => {
-	const value = record?.[key];
-	return isVariableAlias(value) ? value : null;
+	const parsed = variableAliasSchema.safeParse(record?.[key]);
+	return parsed.success ? parsed.data : null;
 };
 
 const getAliasFromArray = (record: unknown, index: number): VariableAlias | null => {
 	if (!Array.isArray(record)) return null;
-	const value = record[index];
-	return isVariableAlias(value) ? value : null;
+	const parsed = variableAliasSchema.safeParse(record[index]);
+	return parsed.success ? parsed.data : null;
 };
 
-const buildTokenRefs = async (boundVariables?: ExtractedBoundVariables): Promise<IRTokenRef[] | undefined> => {
+const buildTokenRefs = async (boundVariables?: ExtractedBoundVariables): Promise<TokenRefMapping[] | undefined> => {
 	if (!boundVariables || boundVariables.ids.length === 0) return undefined;
 	const refs = await Promise.all(
 		boundVariables.ids.map(async (id) => {
@@ -119,7 +116,7 @@ const buildTokenRefs = async (boundVariables?: ExtractedBoundVariables): Promise
 	return refs;
 };
 
-export const buildTokenRefMap = (tokenRefs?: IRTokenRef[]): Map<string, TokenRef> => {
+export const buildTokenRefMap = (tokenRefs?: TokenRefMapping[]): Map<string, TokenRef> => {
 	if (!tokenRefs) return new Map();
 	return new Map(tokenRefs.map((ref) => [ref.variableId, ref.token]));
 };
@@ -147,10 +144,11 @@ const resolveFillsValue = (
 	fills: TokenizedValue<NormalizedFill[]>,
 	tokenRefs: Map<string, TokenRef>,
 ): TokenizedValue<NormalizedFill[]> => {
-	const fallback = isTokenizedValue(fills) ? fills.fallback : fills;
+	const parsed = tokenizedValueSchema.safeParse(fills);
+	const fallback = parsed.success ? (parsed.data.fallback as NormalizedFill[]) : (fills as NormalizedFill[]);
 	const resolved = fallback.map((fill) => resolveFillTokens(fill, tokenRefs));
-	if (isTokenizedValue(fills)) {
-		return { tokenRef: resolveTokenRef(fills.tokenRef, tokenRefs), fallback: resolved };
+	if (parsed.success) {
+		return { tokenRef: resolveTokenRef(parsed.data.tokenRef as TokenRef, tokenRefs), fallback: resolved };
 	}
 	return resolved;
 };
@@ -354,7 +352,8 @@ const resolveTextTokens = (
 
 	const charactersAlias = getAlias(nodeBoundVariables, 'characters');
 
-	const textStyleId = isTokenizedValue(text.textStyleId as TokenizedValue<string>)
+	const textStyleIdParsed = tokenizedValueSchema.safeParse(text.textStyleId);
+	const textStyleId = textStyleIdParsed.success
 		? resolveTokenizedValue(text.textStyleId as TokenizedValue<string>, tokenRefs)
 		: text.textStyleId;
 
@@ -426,7 +425,7 @@ export const buildComponentProperties = (
 	return result;
 };
 
-const buildInstanceRef = (node: SceneNode): IRInstanceRef | undefined => {
+const buildInstanceRef = (node: SceneNode): InstanceRef | undefined => {
 	if (node.type !== 'INSTANCE') return undefined;
 	const mainComponent = node.mainComponent;
 	if (!mainComponent) return undefined;
@@ -443,7 +442,7 @@ const buildInstanceRef = (node: SceneNode): IRInstanceRef | undefined => {
 	};
 };
 
-const collectImageAssets = (fills: NormalizedFill[], assets: Map<string, IRAssetRef>) => {
+const collectImageAssets = (fills: NormalizedFill[], assets: Map<string, AssetRef>) => {
 	for (let index = 0; index < fills.length; index += 1) {
 		const fill = fills[index];
 		if (fill.type !== 'image') continue;
@@ -452,8 +451,8 @@ const collectImageAssets = (fills: NormalizedFill[], assets: Map<string, IRAsset
 	}
 };
 
-const buildAssetRefs = (style: NormalizedStyle): IRAssetRef[] | undefined => {
-	const assets = new Map<string, IRAssetRef>();
+const buildAssetRefs = (style: NormalizedStyle): AssetRef[] | undefined => {
+	const assets = new Map<string, AssetRef>();
 	if (style.fills.type === 'uniform') {
 		collectImageAssets(style.fills.value, assets);
 	}

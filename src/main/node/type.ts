@@ -1,5 +1,4 @@
 import type { ExtractedBoundVariables } from '../pipeline/extract/types';
-import type { IRAssetRef, IRInstanceRef, IRTokenRef } from '../pipeline/ir/types';
 import type {
 	NormalizedEffect,
 	NormalizedFill,
@@ -12,8 +11,29 @@ import type {
 } from '../pipeline/normalize/types';
 
 /*
+ * 참조 타입
+ */
+export type InstanceRef = {
+	componentId: string;
+	componentName: string;
+	variantInfo?: Record<string, string>;
+};
+
+export type TokenRefMapping = {
+	variableId: string;
+	token: TokenRef;
+};
+
+export type AssetRef = {
+	kind: 'image' | 'vector' | 'mask';
+	id: string;
+	name?: string;
+};
+
+/*
  * 핵심 타입 필터
  */
+
 export type ExtractNodeType = Extract<SceneNode['type'], 'FRAME' | 'INSTANCE' | 'GROUP' | 'TEXT' | 'RECTANGLE'>;
 
 type RowsColsLayoutGrid = Extract<LayoutGrid, { pattern: 'ROWS' | 'COLUMNS' }>;
@@ -75,9 +95,9 @@ export interface BaseReactNode<
 	type: TType;
 	props: TProps;
 	children?: TChildren;
-	instanceRef?: IRInstanceRef;
-	tokensRef?: IRTokenRef[];
-	assets?: IRAssetRef[];
+	instanceRef?: InstanceRef;
+	tokensRef?: TokenRefMapping[];
+	assets?: AssetRef[];
 }
 
 /*

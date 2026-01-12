@@ -1,3 +1,5 @@
+import type { ExtractedBoundVariables } from '../pipeline/extract/types';
+import type { IRAssetRef, IRInstanceRef, IRTokenRef } from '../pipeline/ir/types';
 import type { NormalizedStyle } from '../pipeline/normalize/types';
 
 /*
@@ -12,6 +14,7 @@ export interface BaseNodeProps<TSTyle = NormalizedStyle> {
 	id: string;
 	name: string;
 	style?: TSTyle;
+	boundVariables?: ExtractedBoundVariables;
 }
 
 /*
@@ -25,6 +28,9 @@ export interface BaseReactNode<
 	type: TType;
 	props: TProps;
 	children?: TChildren;
+	instanceRef?: IRInstanceRef;
+	tokensRef?: IRTokenRef[];
+	assets?: IRAssetRef[];
 }
 
 /*

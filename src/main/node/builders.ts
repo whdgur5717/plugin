@@ -1,4 +1,4 @@
-import { extractBaseProps } from './props';
+import { buildNodeData } from './props';
 import type {
 	ExtractNodeType,
 	FrameReactNode,
@@ -9,37 +9,41 @@ import type {
 	TextReactNode,
 } from './type';
 
-export const extractTextNode = (node: TextNode): TextReactNode => ({
+export const buildTextNode = (node: TextNode): TextReactNode => ({
 	type: 'TEXT',
-	props: extractBaseProps(node),
+	...buildNodeData(node),
 });
 
-export const extractFrameNode = (node: FrameNode): FrameReactNode => ({
+export const buildFrameNode = (node: FrameNode): FrameReactNode => ({
 	type: 'FRAME',
-	props: extractBaseProps(node),
+	...buildNodeData(node),
 });
 
-export const extractInstanceNode = (node: InstanceNode): InstanceReactNode => ({
-	type: 'INSTANCE',
-	props: {
-		...extractBaseProps(node),
-		componentProperties: node.componentProperties,
-	},
-});
+export const buildInstanceNode = (node: InstanceNode): InstanceReactNode => {
+	const data = buildNodeData(node);
+	return {
+		type: 'INSTANCE',
+		...data,
+		props: {
+			...data.props,
+			componentProperties: node.componentProperties,
+		},
+	};
+};
 
-export const extractGroupNode = (node: GroupNode): GroupReactNode => ({
+export const buildGroupNode = (node: GroupNode): GroupReactNode => ({
 	type: 'GROUP',
-	props: extractBaseProps(node),
+	...buildNodeData(node),
 });
 
-export const extractRectangleNode = (node: RectangleNode): RectangleReactNode => ({
+export const buildRectangleNode = (node: RectangleNode): RectangleReactNode => ({
 	type: 'RECTANGLE',
-	props: extractBaseProps(node),
+	...buildNodeData(node),
 });
 
-export const extractGenericNode = (
+export const buildGenericNode = (
 	node: Extract<SceneNode, { type: Exclude<SceneNode['type'], ExtractNodeType> }>,
 ): GenericReactNode => ({
 	type: node.type,
-	props: extractBaseProps(node),
+	...buildNodeData(node),
 });

@@ -1,33 +1,33 @@
 import {
-	extractFrameNode,
-	extractGenericNode,
-	extractGroupNode,
-	extractInstanceNode,
-	extractRectangleNode,
-	extractTextNode,
+	buildFrameNode,
+	buildGenericNode,
+	buildGroupNode,
+	buildInstanceNode,
+	buildRectangleNode,
+	buildTextNode,
 } from './builders';
 import type { ReactNode } from './type';
 
-export const figmaNodeToReactNode = async (node: SceneNode): Promise<ReactNode> => {
+export const buildNodeTree = async (node: SceneNode): Promise<ReactNode> => {
 	let baseNode: ReactNode;
 	switch (node.type) {
 		case 'TEXT':
-			baseNode = extractTextNode(node);
+			baseNode = await buildTextNode(node);
 			break;
 		case 'RECTANGLE':
-			baseNode = extractRectangleNode(node);
+			baseNode = await buildRectangleNode(node);
 			break;
 		case 'INSTANCE':
-			baseNode = extractInstanceNode(node);
+			baseNode = await buildInstanceNode(node);
 			break;
 		case 'FRAME':
-			baseNode = extractFrameNode(node);
+			baseNode = await buildFrameNode(node);
 			break;
 		case 'GROUP':
-			baseNode = extractGroupNode(node);
+			baseNode = await buildGroupNode(node);
 			break;
 		default:
-			baseNode = extractGenericNode(node);
+			baseNode = await buildGenericNode(node);
 	}
 
 	const childrenNodes = 'children' in node ? node.children.filter((child) => child.visible !== false) : [];
@@ -36,6 +36,8 @@ export const figmaNodeToReactNode = async (node: SceneNode): Promise<ReactNode> 
 		return baseNode;
 	}
 
-	const children = await Promise.all(childrenNodes.map((child) => figmaNodeToReactNode(child)));
+	const children = await Promise.all(childrenNodes.map((child) => buildNodeTree(child)));
 	return { ...baseNode, children };
 };
+
+export const figmaNodeToReactNode = buildNodeTree;

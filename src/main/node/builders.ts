@@ -1,4 +1,4 @@
-import { buildNodeData } from './props';
+import { buildComponentProperties, buildNodeData, buildTokenRefMap } from './props';
 import type {
 	ExtractNodeType,
 	FrameReactNode,
@@ -19,10 +19,18 @@ export const buildFrameNode = async (node: FrameNode): Promise<FrameReactNode> =
 	...(await buildNodeData(node)),
 });
 
-export const buildInstanceNode = async (node: InstanceNode): Promise<InstanceReactNode> => ({
-	type: 'INSTANCE',
-	...(await buildNodeData(node)),
-});
+export const buildInstanceNode = async (node: InstanceNode): Promise<InstanceReactNode> => {
+	const data = await buildNodeData(node);
+	const tokenRefMap = buildTokenRefMap(data.tokensRef);
+	const nodeBoundVariables = node.boundVariables as Record<string, unknown> | undefined;
+	const componentProperties = buildComponentProperties(node, nodeBoundVariables, tokenRefMap);
+
+	return {
+		type: 'INSTANCE',
+		...data,
+		props: componentProperties ? { ...data.props, componentProperties } : data.props,
+	};
+};
 
 export const buildGroupNode = async (node: GroupNode): Promise<GroupReactNode> => ({
 	type: 'GROUP',

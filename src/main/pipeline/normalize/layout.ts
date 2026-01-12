@@ -7,18 +7,54 @@ import type {
 	NormalizedLayoutGap,
 	NormalizedLayoutPadding,
 	NormalizedLayoutPosition,
+	TokenizedValue,
 } from './types';
 
 const toNumber = (value: number | undefined): number => (typeof value === 'number' ? value : 0);
 
-const buildPosition = (layout: ExtractedLayoutProps): NormalizedLayoutPosition => ({
-	x: toNumber(layout.x),
-	y: toNumber(layout.y),
-	width: toNumber(layout.width),
-	height: toNumber(layout.height),
-});
+const isVariableAlias = (value: unknown): value is VariableAlias =>
+	!!value &&
+	typeof value === 'object' &&
+	'type' in value &&
+	'id' in value &&
+	(value as { type?: unknown }).type === 'VARIABLE_ALIAS' &&
+	typeof (value as { id?: unknown }).id === 'string';
 
-const buildPadding = (layout: ExtractedLayoutProps): NormalizedLayoutPadding | undefined => {
+const toTokenizedValue = <T>(value: T, alias?: VariableAlias | null): TokenizedValue<T> =>
+	alias ? { tokenRef: { id: alias.id }, fallback: value } : value;
+
+const getAlias = (boundVariables: Record<string, unknown> | undefined, key: string) => {
+	const value = boundVariables?.[key];
+	return isVariableAlias(value) ? value : null;
+};
+
+const buildPosition = (
+	layout: ExtractedLayoutProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedLayoutPosition => {
+	const width = toNumber(layout.width);
+	const height = toNumber(layout.height);
+	const minWidth = typeof layout.minWidth === 'number' ? layout.minWidth : null;
+	const maxWidth = typeof layout.maxWidth === 'number' ? layout.maxWidth : null;
+	const minHeight = typeof layout.minHeight === 'number' ? layout.minHeight : null;
+	const maxHeight = typeof layout.maxHeight === 'number' ? layout.maxHeight : null;
+
+	return {
+		x: toNumber(layout.x),
+		y: toNumber(layout.y),
+		width: toTokenizedValue(width, getAlias(boundVariables, 'width')),
+		height: toTokenizedValue(height, getAlias(boundVariables, 'height')),
+		minWidth: minWidth === null ? null : toTokenizedValue(minWidth, getAlias(boundVariables, 'minWidth')),
+		maxWidth: maxWidth === null ? null : toTokenizedValue(maxWidth, getAlias(boundVariables, 'maxWidth')),
+		minHeight: minHeight === null ? null : toTokenizedValue(minHeight, getAlias(boundVariables, 'minHeight')),
+		maxHeight: maxHeight === null ? null : toTokenizedValue(maxHeight, getAlias(boundVariables, 'maxHeight')),
+	};
+};
+
+const buildPadding = (
+	layout: ExtractedLayoutProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedLayoutPadding | undefined => {
 	const hasPadding =
 		isNumber(layout.paddingTop) ||
 		isNumber(layout.paddingRight) ||
@@ -28,50 +64,70 @@ const buildPadding = (layout: ExtractedLayoutProps): NormalizedLayoutPadding | u
 	if (!hasPadding) return undefined;
 
 	return {
-		top: toNumber(layout.paddingTop),
-		right: toNumber(layout.paddingRight),
-		bottom: toNumber(layout.paddingBottom),
-		left: toNumber(layout.paddingLeft),
+		top: toTokenizedValue(toNumber(layout.paddingTop), getAlias(boundVariables, 'paddingTop')),
+		right: toTokenizedValue(toNumber(layout.paddingRight), getAlias(boundVariables, 'paddingRight')),
+		bottom: toTokenizedValue(toNumber(layout.paddingBottom), getAlias(boundVariables, 'paddingBottom')),
+		left: toTokenizedValue(toNumber(layout.paddingLeft), getAlias(boundVariables, 'paddingLeft')),
 	};
 };
 
-const buildGap = (layout: ExtractedLayoutProps): NormalizedLayoutGap | undefined => {
+const buildGap = (
+	layout: ExtractedLayoutProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedLayoutGap | undefined => {
 	const gap: NormalizedLayoutGap = {};
+	const gridRowGapAlias = getAlias(boundVariables, 'gridRowGap');
+	const gridColumnGapAlias = getAlias(boundVariables, 'gridColumnGap');
+	const itemSpacingAlias = getAlias(boundVariables, 'itemSpacing');
+	const counterAxisSpacingAlias = getAlias(boundVariables, 'counterAxisSpacing');
 
 	if (layout.layoutMode === 'GRID') {
-		if (isNumber(layout.gridRowGap)) gap.row = layout.gridRowGap;
-		if (isNumber(layout.gridColumnGap)) gap.column = layout.gridColumnGap;
+		if (isNumber(layout.gridRowGap)) {
+			gap.row = toTokenizedValue(layout.gridRowGap, gridRowGapAlias);
+		}
+		if (isNumber(layout.gridColumnGap)) {
+			gap.column = toTokenizedValue(layout.gridColumnGap, gridColumnGapAlias);
+		}
 	}
 
 	if (layout.layoutMode === 'HORIZONTAL') {
-		if (isNumber(layout.itemSpacing)) gap.column = layout.itemSpacing;
+		if (isNumber(layout.itemSpacing)) {
+			gap.column = toTokenizedValue(layout.itemSpacing, itemSpacingAlias);
+		}
 		if (layout.layoutWrap === 'WRAP' && isNumber(layout.counterAxisSpacing)) {
-			gap.row = layout.counterAxisSpacing;
+			gap.row = toTokenizedValue(layout.counterAxisSpacing, counterAxisSpacingAlias);
 		}
 	}
 
 	if (layout.layoutMode === 'VERTICAL') {
-		if (isNumber(layout.itemSpacing)) gap.row = layout.itemSpacing;
+		if (isNumber(layout.itemSpacing)) {
+			gap.row = toTokenizedValue(layout.itemSpacing, itemSpacingAlias);
+		}
 		if (layout.layoutWrap === 'WRAP' && isNumber(layout.counterAxisSpacing)) {
-			gap.column = layout.counterAxisSpacing;
+			gap.column = toTokenizedValue(layout.counterAxisSpacing, counterAxisSpacingAlias);
 		}
 	}
 
-	if (!isNumber(gap.row) && !isNumber(gap.column)) return undefined;
+	const hasRow = gap.row !== undefined && gap.row !== null;
+	const hasColumn = gap.column !== undefined && gap.column !== null;
+	if (!hasRow && !hasColumn) return undefined;
 	return gap;
 };
 
-const buildContainer = (layout: ExtractedLayoutProps): NormalizedLayoutContainer | undefined => {
+const buildContainer = (
+	layout: ExtractedLayoutProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedLayoutContainer | undefined => {
 	const container: NormalizedLayoutContainer = {};
 
 	if (layout.layoutMode === 'HORIZONTAL' || layout.layoutMode === 'VERTICAL') {
 		container.direction = layout.layoutMode;
 	}
 
-	const padding = buildPadding(layout);
+	const padding = buildPadding(layout, boundVariables);
 	if (padding) container.padding = padding;
 
-	const gap = buildGap(layout);
+	const gap = buildGap(layout, boundVariables);
 	if (gap) container.gap = gap;
 
 	if (layout.primaryAxisAlignItems) container.primaryAxisAlignItems = layout.primaryAxisAlignItems;
@@ -93,11 +149,13 @@ const buildContainer = (layout: ExtractedLayoutProps): NormalizedLayoutContainer
 		Array.isArray(layout.gridRowSizes) ||
 		Array.isArray(layout.gridColumnSizes)
 	) {
+		const gridRowGapAlias = getAlias(boundVariables, 'gridRowGap');
+		const gridColumnGapAlias = getAlias(boundVariables, 'gridColumnGap');
 		container.grid = {
 			rowCount: toNumber(layout.gridRowCount),
 			columnCount: toNumber(layout.gridColumnCount),
-			rowGap: toNumber(layout.gridRowGap),
-			columnGap: toNumber(layout.gridColumnGap),
+			rowGap: toTokenizedValue(toNumber(layout.gridRowGap), gridRowGapAlias),
+			columnGap: toTokenizedValue(toNumber(layout.gridColumnGap), gridColumnGapAlias),
 			rowSizes: layout.gridRowSizes ?? [],
 			columnSizes: layout.gridColumnSizes ?? [],
 		};
@@ -136,7 +194,10 @@ const buildChild = (layout: ExtractedLayoutProps): NormalizedLayoutChild | undef
 	return Object.keys(child).length > 0 ? child : undefined;
 };
 
-export const normalizeLayout = (layout: ExtractedLayoutProps): NormalizedLayout => {
+export const normalizeLayout = (
+	layout: ExtractedLayoutProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedLayout => {
 	const mode: NormalizedLayout['mode'] =
 		layout.layoutMode === 'GRID'
 			? 'GRID'
@@ -146,14 +207,14 @@ export const normalizeLayout = (layout: ExtractedLayoutProps): NormalizedLayout 
 
 	const normalized: NormalizedLayout = {
 		mode,
-		position: buildPosition(layout),
+		position: buildPosition(layout, boundVariables),
 	};
 
 	if (layout.constraints) {
 		normalized.constraints = layout.constraints;
 	}
 
-	const container = buildContainer(layout);
+	const container = buildContainer(layout, boundVariables);
 	if (container) normalized.container = container;
 
 	const child = buildChild(layout);

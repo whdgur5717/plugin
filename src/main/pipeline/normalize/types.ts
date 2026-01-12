@@ -160,22 +160,26 @@ export type NormalizedStroke = {
 export type NormalizedLayoutMode = 'AUTO' | 'GRID' | 'ABSOLUTE';
 
 export type NormalizedLayoutPosition = {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
+	x: TokenizedValue<number>;
+	y: TokenizedValue<number>;
+	width: TokenizedValue<number>;
+	height: TokenizedValue<number>;
+	minWidth?: TokenizedValue<number> | null;
+	maxWidth?: TokenizedValue<number> | null;
+	minHeight?: TokenizedValue<number> | null;
+	maxHeight?: TokenizedValue<number> | null;
 };
 
 export type NormalizedLayoutPadding = {
-	top: number;
-	right: number;
-	bottom: number;
-	left: number;
+	top: TokenizedValue<number>;
+	right: TokenizedValue<number>;
+	bottom: TokenizedValue<number>;
+	left: TokenizedValue<number>;
 };
 
 export type NormalizedLayoutGap = {
-	row?: number | null;
-	column?: number | null;
+	row?: TokenizedValue<number> | null;
+	column?: TokenizedValue<number> | null;
 };
 
 export type NormalizedLayoutContainer = {
@@ -193,8 +197,8 @@ export type NormalizedLayoutContainer = {
 	grid?: {
 		rowCount: number;
 		columnCount: number;
-		rowGap: number;
-		columnGap: number;
+		rowGap: TokenizedValue<number>;
+		columnGap: TokenizedValue<number>;
 		rowSizes: Array<GridTrackSize>;
 		columnSizes: Array<GridTrackSize>;
 	};
@@ -264,7 +268,7 @@ export type NormalizedTextRun = {
 };
 
 export type NormalizedText = {
-	characters: string;
+	characters: TokenizedValue<string>;
 	runs: NormalizedTextRun[];
 	textAlignHorizontal: 'LEFT' | 'CENTER' | 'RIGHT' | 'JUSTIFIED';
 	textAlignVertical: 'TOP' | 'CENTER' | 'BOTTOM';

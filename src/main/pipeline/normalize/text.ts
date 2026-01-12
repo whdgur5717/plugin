@@ -1,7 +1,8 @@
-import { isNumber } from 'es-toolkit/compat';
-import type { ExtractedTextProps } from '../extract/text';
-import type { NormalizedText, NormalizedTextRun, NormalizedTextRunStyle, NormalizedTextSegment } from './types';
 import { normalizePaints } from './fills';
+import { isNumber } from 'es-toolkit/compat';
+
+type ExtractedTextProps = import('../extract/text').ExtractedTextProps;
+type NormalizedText = import('./types').NormalizedText;
 
 const isVariableAlias = (value: unknown): value is VariableAlias =>
 	!!value &&
@@ -21,7 +22,7 @@ const getAlias = (boundVariables: Record<string, unknown> | undefined, key: stri
 
 type TextSegment = NonNullable<ExtractedTextProps['characters']>[number];
 
-const buildRunStyle = (segment: TextSegment): NormalizedTextRunStyle => {
+const buildRunStyle = (segment: TextSegment): NormalizedText['runs'][number]['style'] => {
 	const boundVariables = segment.boundVariables as Record<string, unknown> | undefined;
 	const fontFamilyAlias = getAlias(boundVariables, 'fontFamily');
 	const fontStyleAlias = getAlias(boundVariables, 'fontStyle');
@@ -65,7 +66,7 @@ const buildRunStyle = (segment: TextSegment): NormalizedTextRunStyle => {
 	};
 };
 
-const buildRuns = (segments: TextSegment[]): NormalizedTextRun[] =>
+const buildRuns = (segments: TextSegment[]): NormalizedText['runs'] =>
 	segments.map((segment) => ({
 		start: segment.start,
 		end: segment.end,
@@ -73,14 +74,14 @@ const buildRuns = (segments: TextSegment[]): NormalizedTextRun[] =>
 		style: buildRunStyle(segment),
 	}));
 
-const buildMixedSegments = <T>(runs: NormalizedTextRun[], getValue: (run: NormalizedTextRun) => T) =>
+const buildMixedSegments = <T>(runs: NormalizedText['runs'], getValue: (run: NormalizedText['runs'][number]) => T) =>
 	runs.map((run) => ({
 		start: run.start,
 		end: run.end,
 		value: getValue(run),
 	}));
 
-const buildTextStyleId = (text: ExtractedTextProps, runs: NormalizedTextRun[]): NormalizedText['textStyleId'] => {
+const buildTextStyleId = (text: ExtractedTextProps, runs: NormalizedText['runs']): NormalizedText['textStyleId'] => {
 	const textStyleId = text.textStyleId;
 	if (typeof textStyleId === 'string') return textStyleId;
 
@@ -91,7 +92,7 @@ const buildTextStyleId = (text: ExtractedTextProps, runs: NormalizedTextRun[]): 
 	return { type: 'mixed', segments };
 };
 
-const buildHyperlink = (text: ExtractedTextProps, runs: NormalizedTextRun[]): NormalizedText['hyperlink'] => {
+const buildHyperlink = (text: ExtractedTextProps, runs: NormalizedText['runs']): NormalizedText['hyperlink'] => {
 	const hyperlink = text.hyperlink;
 	if (hyperlink !== figma.mixed) return hyperlink ?? null;
 
@@ -99,15 +100,19 @@ const buildHyperlink = (text: ExtractedTextProps, runs: NormalizedTextRun[]): No
 	return { type: 'mixed', segments };
 };
 
-export const normalizeText = (text: ExtractedTextProps): NormalizedText | null => {
+export const normalizeText = (
+	text: ExtractedTextProps,
+	nodeBoundVariables?: Record<string, unknown>,
+): NormalizedText | null => {
 	const segments = text.characters as TextSegment[] | undefined;
 	if (!segments || segments.length === 0) return null;
 
 	const runs = buildRuns(segments);
 	const characters = runs.map((run) => run.characters).join('');
+	const charactersAlias = getAlias(nodeBoundVariables, 'characters');
 
 	return {
-		characters,
+		characters: toTokenizedValue(characters, charactersAlias),
 		runs,
 		textAlignHorizontal: text.textAlignHorizontal ?? 'LEFT',
 		textAlignVertical: text.textAlignVertical ?? 'TOP',

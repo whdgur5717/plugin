@@ -1,11 +1,36 @@
 import { isNumber } from 'es-toolkit/compat';
+import { normalizePaints } from './fills';
 import type { ExtractedStrokeProps } from '../extract/stroke';
 import type { NormalizedCorner, NormalizedStroke, NormalizedStrokeWeight } from './types';
-import { normalizePaints } from './fills';
 
 const toNumber = (value: number | undefined): number => (isNumber(value) ? value : 0);
 
-const buildStrokeWeight = (stroke: ExtractedStrokeProps): NormalizedStrokeWeight => {
+const isVariableAlias = (value: unknown): value is VariableAlias =>
+	!!value &&
+	typeof value === 'object' &&
+	'type' in value &&
+	'id' in value &&
+	(value as { type?: unknown }).type === 'VARIABLE_ALIAS' &&
+	typeof (value as { id?: unknown }).id === 'string';
+
+const toTokenizedValue = <T>(value: T, alias?: VariableAlias | null) =>
+	alias ? { tokenRef: { id: alias.id }, fallback: value } : value;
+
+const getAlias = (boundVariables: Record<string, unknown> | undefined, key: string) => {
+	const value = boundVariables?.[key];
+	return isVariableAlias(value) ? value : null;
+};
+
+const buildStrokeWeight = (
+	stroke: ExtractedStrokeProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedStrokeWeight => {
+	const weightAlias = getAlias(boundVariables, 'strokeWeight');
+	const topAlias = getAlias(boundVariables, 'strokeTopWeight');
+	const rightAlias = getAlias(boundVariables, 'strokeRightWeight');
+	const bottomAlias = getAlias(boundVariables, 'strokeBottomWeight');
+	const leftAlias = getAlias(boundVariables, 'strokeLeftWeight');
+
 	const weight = stroke.strokeWeight;
 	const hasIndividual =
 		isNumber(stroke.strokeTopWeight) &&
@@ -17,28 +42,36 @@ const buildStrokeWeight = (stroke: ExtractedStrokeProps): NormalizedStrokeWeight
 		if (hasIndividual) {
 			return {
 				type: 'individual',
-				top: toNumber(stroke.strokeTopWeight),
-				right: toNumber(stroke.strokeRightWeight),
-				bottom: toNumber(stroke.strokeBottomWeight),
-				left: toNumber(stroke.strokeLeftWeight),
+				top: toTokenizedValue(toNumber(stroke.strokeTopWeight), topAlias),
+				right: toTokenizedValue(toNumber(stroke.strokeRightWeight), rightAlias),
+				bottom: toTokenizedValue(toNumber(stroke.strokeBottomWeight), bottomAlias),
+				left: toTokenizedValue(toNumber(stroke.strokeLeftWeight), leftAlias),
 			};
 		}
-		return { type: 'uniform', value: 0 };
+		return { type: 'uniform', value: toTokenizedValue(0, weightAlias) };
 	}
 
-	return { type: 'uniform', value: weight };
+	return { type: 'uniform', value: toTokenizedValue(weight, weightAlias) };
 };
 
-const buildCorner = (stroke: ExtractedStrokeProps): NormalizedCorner | null => {
+const buildCorner = (
+	stroke: ExtractedStrokeProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedCorner | null => {
 	const smoothing = isNumber(stroke.cornerSmoothing) ? stroke.cornerSmoothing : 0;
+	const topLeftAlias = getAlias(boundVariables, 'topLeftRadius');
+	const topRightAlias = getAlias(boundVariables, 'topRightRadius');
+	const bottomRightAlias = getAlias(boundVariables, 'bottomRightRadius');
+	const bottomLeftAlias = getAlias(boundVariables, 'bottomLeftRadius');
+	const uniformAlias = topLeftAlias ?? topRightAlias ?? bottomRightAlias ?? bottomLeftAlias;
 
 	if (stroke.cornerRadius === figma.mixed) {
 		const values = [
-			stroke.topLeftRadius,
-			stroke.topRightRadius,
-			stroke.bottomRightRadius,
-			stroke.bottomLeftRadius,
-		].map((value) => (isNumber(value) ? value : 0));
+			toTokenizedValue(toNumber(stroke.topLeftRadius), topLeftAlias),
+			toTokenizedValue(toNumber(stroke.topRightRadius), topRightAlias),
+			toTokenizedValue(toNumber(stroke.bottomRightRadius), bottomRightAlias),
+			toTokenizedValue(toNumber(stroke.bottomLeftRadius), bottomLeftAlias),
+		];
 		return {
 			radius: { type: 'mixed', values },
 			smoothing,
@@ -47,7 +80,7 @@ const buildCorner = (stroke: ExtractedStrokeProps): NormalizedCorner | null => {
 
 	if (isNumber(stroke.cornerRadius)) {
 		return {
-			radius: { type: 'uniform', value: stroke.cornerRadius },
+			radius: { type: 'uniform', value: toTokenizedValue(stroke.cornerRadius, uniformAlias) },
 			smoothing,
 		};
 	}
@@ -60,11 +93,11 @@ const buildCorner = (stroke: ExtractedStrokeProps): NormalizedCorner | null => {
 
 	if (hasIndividual) {
 		const values = [
-			stroke.topLeftRadius,
-			stroke.topRightRadius,
-			stroke.bottomRightRadius,
-			stroke.bottomLeftRadius,
-		].map((value) => (isNumber(value) ? value : 0));
+			toTokenizedValue(toNumber(stroke.topLeftRadius), topLeftAlias),
+			toTokenizedValue(toNumber(stroke.topRightRadius), topRightAlias),
+			toTokenizedValue(toNumber(stroke.bottomRightRadius), bottomRightAlias),
+			toTokenizedValue(toNumber(stroke.bottomLeftRadius), bottomLeftAlias),
+		];
 		return {
 			radius: { type: 'mixed', values },
 			smoothing,
@@ -104,13 +137,16 @@ const normalizeJoin = (
 	return join ?? 'MITER';
 };
 
-export const normalizeStroke = (props: ExtractedStrokeProps): NormalizedStroke | null => {
+export const normalizeStroke = (
+	props: ExtractedStrokeProps,
+	boundVariables?: Record<string, unknown>,
+): NormalizedStroke | null => {
 	const paints = normalizePaints(props.strokes);
 	if (paints.length === 0) return null;
 
 	const normalized: NormalizedStroke = {
 		paints,
-		weight: buildStrokeWeight(props),
+		weight: buildStrokeWeight(props, boundVariables),
 		align: props.strokeAlign ?? 'CENTER',
 		cap: normalizeCap(props.strokeCap),
 		join: normalizeJoin(props.strokeJoin),
@@ -118,7 +154,7 @@ export const normalizeStroke = (props: ExtractedStrokeProps): NormalizedStroke |
 		miterLimit: props.strokeMiterLimit ?? 0,
 	};
 
-	const corner = buildCorner(props);
+	const corner = buildCorner(props, boundVariables);
 	if (corner) normalized.corner = corner;
 	if (props.vectorNetwork) normalized.vectorNetwork = props.vectorNetwork;
 

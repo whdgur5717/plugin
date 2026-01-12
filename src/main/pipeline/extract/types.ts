@@ -7,10 +7,13 @@ import type { ExtractedTextProps } from './text';
 export type ExtractedBoundVariables = {
 	ids: string[];
 	byGroup: {
+		node: string[];
 		fills: string[];
 		effects: string[];
 		stroke: string[];
 		text: string[];
+		layoutGrids: string[];
+		componentProps: string[];
 	};
 };
 
@@ -21,4 +24,5 @@ export interface ExtractedStyle {
 	text: ExtractedTextProps;
 	stroke: ExtractedStrokeProps;
 	boundVariables: ExtractedBoundVariables;
+	nodeBoundVariables?: Record<string, unknown>;
 }

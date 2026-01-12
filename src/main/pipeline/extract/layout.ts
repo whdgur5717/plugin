@@ -28,6 +28,10 @@ export const LAYOUT_SIZING_KEYS = [
 	'layoutAlign',
 	'layoutGrow',
 	'layoutPositioning',
+	'minWidth',
+	'maxWidth',
+	'minHeight',
+	'maxHeight',
 ] satisfies ReadonlyArray<keyof LayoutMixin>;
 
 export const GRID_CONTAINER_KEYS = [

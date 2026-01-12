@@ -4,9 +4,9 @@ import type {
 	NormalizedEffect,
 	NormalizedFill,
 	NormalizedLayout,
-	NormalizedStyle,
 	NormalizedStroke,
 	NormalizedText,
+	NormalizedValue,
 	TokenRef,
 	TokenizedValue,
 } from '../pipeline/normalize/types';
@@ -35,12 +35,12 @@ export type OutputNormalizedLayout = NormalizedLayout & {
 };
 
 export type OutputNormalizedStroke = Omit<NormalizedStroke, 'paints'> & {
-	paints: Array<TokenizedValue<NormalizedFill>>;
+	paints: NormalizedValue<Array<TokenizedValue<NormalizedFill>>>;
 };
 
-export type OutputNormalizedStyle = Omit<NormalizedStyle, 'fills' | 'effects' | 'stroke' | 'layout'> & {
-	fills: Array<TokenizedValue<NormalizedFill>>;
-	effects: Array<TokenizedValue<NormalizedEffect>>;
+export type OutputNormalizedStyle = {
+	fills: NormalizedValue<Array<TokenizedValue<NormalizedFill>>>;
+	effects: NormalizedValue<Array<TokenizedValue<NormalizedEffect>>>;
 	stroke: OutputNormalizedStroke | null;
 	layout: OutputNormalizedLayout;
 	text: NormalizedText | null;

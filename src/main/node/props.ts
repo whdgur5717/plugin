@@ -10,6 +10,7 @@ import type {
 	NormalizedStyle,
 	NormalizedStroke,
 	NormalizedText,
+	NormalizedValue,
 	TokenRef,
 	TokenizedValue,
 } from '../pipeline/normalize/types';
@@ -32,7 +33,7 @@ type BuiltNodeData = {
 
 type TextSegment = NonNullable<ExtractedTextProps['characters']>[number];
 
-type BoundVariablesRecord = Record<string, unknown> | undefined;
+export type BoundVariablesRecord = Record<string, unknown> | undefined;
 
 const variableRegistry = new VariableRegistry();
 
@@ -118,7 +119,7 @@ const buildTokenRefs = async (boundVariables?: ExtractedBoundVariables): Promise
 	return refs;
 };
 
-const buildTokenRefMap = (tokenRefs?: IRTokenRef[]): Map<string, TokenRef> => {
+export const buildTokenRefMap = (tokenRefs?: IRTokenRef[]): Map<string, TokenRef> => {
 	if (!tokenRefs) return new Map();
 	return new Map(tokenRefs.map((ref) => [ref.variableId, ref.token]));
 };
@@ -181,11 +182,16 @@ const resolveStrokeTokens = (
 	strokeAliases: unknown,
 	tokenRefs: Map<string, TokenRef>,
 ): OutputNormalizedStroke => {
-	const paints = stroke.paints.map((paint, index) => {
-		const resolved = resolveFillTokens(paint, tokenRefs);
-		const alias = getAliasFromArray(strokeAliases, index);
-		return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
-	});
+	const paintsValue =
+		stroke.paints.type === 'uniform'
+			? stroke.paints.value.map((paint, index) => {
+					const resolved = resolveFillTokens(paint, tokenRefs);
+					const alias = getAliasFromArray(strokeAliases, index);
+					return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
+				})
+			: [];
+	const paints: NormalizedValue<Array<TokenizedValue<NormalizedFill>>> =
+		stroke.paints.type === 'uniform' ? { type: 'uniform', value: paintsValue } : { type: 'mixed', values: [] };
 
 	const weight =
 		stroke.weight.type === 'uniform'
@@ -398,7 +404,7 @@ const buildLayoutGrids = (node: SceneNode, tokenRefs: Map<string, TokenRef>): Ou
 	});
 };
 
-const buildComponentProperties = (
+export const buildComponentProperties = (
 	node: InstanceNode,
 	nodeBoundVariables: BoundVariablesRecord,
 	tokenRefs: Map<string, TokenRef>,
@@ -448,9 +454,11 @@ const collectImageAssets = (fills: NormalizedFill[], assets: Map<string, IRAsset
 
 const buildAssetRefs = (style: NormalizedStyle): IRAssetRef[] | undefined => {
 	const assets = new Map<string, IRAssetRef>();
-	collectImageAssets(style.fills, assets);
-	if (style.stroke) {
-		collectImageAssets(style.stroke.paints, assets);
+	if (style.fills.type === 'uniform') {
+		collectImageAssets(style.fills.value, assets);
+	}
+	if (style.stroke && style.stroke.paints.type === 'uniform') {
+		collectImageAssets(style.stroke.paints.value, assets);
 	}
 	if (style.text) {
 		for (let index = 0; index < style.text.runs.length; index += 1) {
@@ -473,17 +481,29 @@ const enrichStyle = (
 	const effectsAliases = nodeBoundVariables?.effects;
 	const strokeAliases = nodeBoundVariables?.strokes;
 
-	const fills = normalizedStyle.fills.map((fill, index) => {
-		const resolved = resolveFillTokens(fill, tokenRefs);
-		const alias = getAliasFromArray(fillsAliases, index);
-		return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
-	});
+	const fillsValue =
+		normalizedStyle.fills.type === 'uniform'
+			? normalizedStyle.fills.value.map((fill, index) => {
+					const resolved = resolveFillTokens(fill, tokenRefs);
+					const alias = getAliasFromArray(fillsAliases, index);
+					return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
+				})
+			: [];
+	const fills: NormalizedValue<Array<TokenizedValue<NormalizedFill>>> =
+		normalizedStyle.fills.type === 'uniform' ? { type: 'uniform', value: fillsValue } : { type: 'mixed', values: [] };
 
-	const effects = normalizedStyle.effects.map((effect, index) => {
-		const resolved = resolveEffectTokens(effect, tokenRefs);
-		const alias = getAliasFromArray(effectsAliases, index);
-		return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
-	});
+	const effectsValue =
+		normalizedStyle.effects.type === 'uniform'
+			? normalizedStyle.effects.value.map((effect, index) => {
+					const resolved = resolveEffectTokens(effect, tokenRefs);
+					const alias = getAliasFromArray(effectsAliases, index);
+					return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
+				})
+			: [];
+	const effects: NormalizedValue<Array<TokenizedValue<NormalizedEffect>>> =
+		normalizedStyle.effects.type === 'uniform'
+			? { type: 'uniform', value: effectsValue }
+			: { type: 'mixed', values: [] };
 
 	const stroke = normalizedStyle.stroke
 		? resolveStrokeTokens(normalizedStyle.stroke, strokeAliases, tokenRefs)
@@ -520,19 +540,12 @@ export const buildNodeData = async (node: SceneNode): Promise<BuiltNodeData> => 
 	const tokenRefMap = buildTokenRefMap(tokensRef);
 	const style = enrichStyle(normalizedStyle, extractedStyle, node, tokenRefMap);
 
-	const props: BaseNodeProps & { componentProperties?: OutputComponentProperties } = {
+	const props: BaseNodeProps = {
 		id: node.id,
 		name: node.name,
 		style,
 		boundVariables: extractedStyle.boundVariables,
 	};
-
-	if (node.type === 'INSTANCE') {
-		const componentProperties = buildComponentProperties(node, extractedStyle.nodeBoundVariables, tokenRefMap);
-		if (componentProperties) {
-			props.componentProperties = componentProperties;
-		}
-	}
 
 	return {
 		props,

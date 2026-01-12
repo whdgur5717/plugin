@@ -18,6 +18,7 @@ export type ExtractedBoundVariables = {
 };
 
 export interface ExtractedStyle {
+	nodeType: string;
 	fills: ExtractedFillProps;
 	effects: ExtractedEffectProps;
 	layout: ExtractedLayoutProps;

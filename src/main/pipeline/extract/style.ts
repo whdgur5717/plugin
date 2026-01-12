@@ -225,6 +225,7 @@ export const extractStyle = (node: SceneNode): ExtractedStyle => {
 	const nodeBoundVariables = 'boundVariables' in node ? node.boundVariables : undefined;
 
 	return {
+		nodeType: node.type,
 		fills,
 		effects,
 		layout,

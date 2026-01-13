@@ -120,9 +120,9 @@ interface BaseReactNode<
 	type: TType;
 	props: TProps;
 	children?: TChildren;
-	instanceRef?: IRInstanceRef; // 컴포넌트 인스턴스 참조
-	tokensRef?: IRTokenRef[]; // 디자인 토큰 참조
-	assets?: IRAssetRef[]; // 이미지/벡터 에셋
+	instanceRef?: InstanceRef; // 컴포넌트 인스턴스 참조
+	tokensRef?: TokenRefMapping[]; // 디자인 토큰 참조
+	assets?: AssetRef[]; // 이미지/벡터 에셋
 }
 ```
 
@@ -172,12 +172,12 @@ const toTokenizedValue = <T>(value: T, alias?: VariableAlias | null): TokenizedV
 
 **중요성**: LLM이 디자인 토큰을 인식하여 `var(--color-primary)` 같은 코드 생성 가능
 
-### 3. NormalizedMixedValue: Mixed 값 타입화
+### 3. NormalizedValue: Mixed 값 타입화
 
 Figma의 `figma.mixed` 상태를 타입 안전하게 표현:
 
 ```typescript
-type NormalizedMixedValue<T> =
+type NormalizedValue<T> =
 	| { type: 'uniform'; value: T }
 	| { type: 'mixed'; values: T[] }
 	| { type: 'range-based'; segments: Array<{ start: number; end: number; value: T }> };
@@ -187,7 +187,7 @@ type NormalizedMixedValue<T> =
 
 ```typescript
 type NormalizedCorner = {
-	radius: NormalizedMixedValue<TokenizedValue<number>>; // Mixed + Tokenized 조합
+	radius: NormalizedValue<TokenizedValue<number>>; // Mixed + Tokenized 조합
 };
 ```
 
@@ -211,6 +211,36 @@ type NormalizedTextRun = {
 	style: NormalizedTextRunStyle; // fontSize, fontName, fills, ...
 };
 ```
+
+### 5. Output 타입 vs Normalized 타입
+
+Normalize 단계에서 생성된 타입은 내부 필드에만 TokenizedValue가 적용됩니다.
+`enrichStyle()`은 배열 요소 레벨까지 TokenizedValue를 적용한 Output 타입을 생성합니다.
+
+**주요 차이점**:
+
+- `NormalizedStyle` → `OutputNormalizedStyle`
+  - `fills: NormalizedValue<NormalizedFill[]>` → `fills: NormalizedValue<Array<TokenizedValue<NormalizedFill>>>`
+  - 각 fill/effect에 개별 tokenRef 적용 가능
+
+- `NormalizedStroke` → `OutputNormalizedStroke`
+  - `paints: NormalizedValue<NormalizedFill[]>` → `paints: NormalizedValue<Array<TokenizedValue<NormalizedFill>>>`
+
+- `NormalizedLayout` → `OutputNormalizedLayout`
+  - `layoutGrids?: OutputLayoutGrid[]` 추가
+
+**예시**:
+```typescript
+// Normalized (내부)
+{ type: 'uniform', value: [{ type: 'solid', color: {...} }] }
+
+// Output (배열 레벨 토큰화)
+{ type: 'uniform', value: [
+  { tokenRef: { id: 'VariableID:1:7' }, fallback: { type: 'solid', color: {...} } }
+]}
+```
+
+이를 통해 LLM이 어떤 특정 fill/effect가 디자인 토큰에 바인딩되어 있는지 인식할 수 있습니다.
 
 ## 노드 처리 흐름
 
@@ -250,9 +280,14 @@ export const buildInstanceNode = (node: InstanceNode): InstanceReactNode => {
 
 1. `extractStyle()` - Figma 노드에서 원시 스타일 추출
 2. `normalizeStyle()` - 추출된 스타일 정규화
-3. `buildInstanceRef()` - 컴포넌트 인스턴스 정보 생성
-4. `buildTokenRefs()` - 토큰 참조 리스트 생성
-5. `buildAssetRefs()` - 이미지/벡터 에셋 리스트 생성
+3. `buildTokenRefs()` - 토큰 참조 리스트 생성 (async)
+4. `buildTokenRefMap()` - TokenRefMapping[] → Map 변환
+5. **`enrichStyle()`** - TokenizedValue 배열 래핑 및 Output 타입 생성
+   - fills/effects/stroke 배열 요소에 tokenRef 적용
+   - layoutGrids 처리
+   - visible/opacity tokenRef 적용
+6. `buildInstanceRef()` - 컴포넌트 인스턴스 정보 생성
+7. `buildAssetRefs()` - 이미지/벡터 에셋 리스트 생성
 
 ## 파일 구조
 
@@ -273,9 +308,157 @@ src/main/
 │   │   ├── style.ts              # normalizeStyle() 오케스트레이터
 │   │   ├── fills.ts, effects.ts, layout.ts, text.ts, stroke.ts
 │   │   └── types.ts              # NormalizedStyle, TokenizedValue, ...
-│   └── variables/                # 토큰/변수 레지스트리
+│   ├── variables/
+│   │   └── registry.ts           # VariableRegistry - VariableAlias 해석
+│   └── shared/
+│       └── schemas.ts            # Zod 스키마 정의
 └── utils/                         # deepPick 등
 ```
+
+## 코딩 가이드라인
+
+### 1. 항상 `figma.mixed` 처리하기
+
+**`figma.mixed`란?**
+
+`figma.mixed`는 Figma Plugin API에서 속성이 여러 다른 값을 가질 때 반환되는 고유 심볼입니다. 예를 들어:
+
+- 문자 범위마다 다른 폰트 크기를 가진 텍스트 노드는 `fontSize: figma.mixed` 반환
+- 다른 모서리 반경을 가진 여러 선택된 사각형은 `cornerRadius: figma.mixed` 반환
+
+**중요**: 절대로 `figma.mixed`를 무시하거나 존재하지 않는 것처럼 취급하지 마세요. 항상 명시적으로 처리하세요.
+
+**좋은 예**:
+
+```typescript
+// mixed 값을 명시적으로 체크하고 처리
+if (textNode.fontSize === figma.mixed) {
+	// 범위별 API를 사용하여 실제 mixed 값 추출
+	const segments = textNode.getStyledTextSegments(['fontSize']);
+	return {
+		type: 'range-based',
+		segments: segments.map((seg) => ({
+			start: seg.start,
+			end: seg.end,
+			value: seg.fontSize,
+		})),
+	};
+}
+// uniform 값 처리
+return { type: 'uniform', value: textNode.fontSize };
+```
+
+```typescript
+// stroke weight의 경우
+if (node.strokeWeight === figma.mixed && 'strokeTopWeight' in node) {
+	// mixed를 무시하는 대신 개별 값 읽기
+	return {
+		type: 'individual',
+		top: node.strokeTopWeight,
+		right: node.strokeRightWeight,
+		bottom: node.strokeBottomWeight,
+		left: node.strokeLeftWeight,
+	};
+}
+return { type: 'uniform', value: node.strokeWeight };
+```
+
+**나쁜 예**:
+
+```typescript
+// ❌ mixed 무시 - 런타임 에러 발생
+const fontSize = node.fontSize; // number | figma.mixed일 수 있음
+return { type: 'uniform', value: fontSize }; // 타입 에러!
+```
+
+**패턴**: Discriminated union을 사용하여 mixed 상태 표현:
+
+```typescript
+type NormalizedValue<T> =
+	| { type: 'uniform'; value: T }
+	| { type: 'mixed'; values: T[] }
+	| { type: 'range-based'; segments: Array<{ start: number; end: number; value: T }> };
+```
+
+### 2. 과도한 방어 코드 지양 - Zod 스키마 사용
+
+**원칙**: TypeScript의 타입 시스템과 Figma API의 보장을 신뢰하세요. 타입 시스템에 따라 발생할 수 없는 경우에 대한 방어 코드를 추가하지 마세요.
+
+**복잡한 타입이 장황한 방어 코드를 필요로 할 때는, Zod 스키마를 선언하고 거기서 타입을 도출하세요.**
+
+Zod의 목적: **스키마 한 번 선언 → `z.infer`로 타입 생성 → 장황한 타입 정의와 방어 코드를 함께 제거**
+
+**나쁜 예** - 장황한 TypeScript 타입 + 방어 코드:
+
+```typescript
+// ❌ 별도 타입 정의 + 긴 방어 체크
+type VariableAlias = {
+	type: 'VARIABLE_ALIAS';
+	id: string;
+};
+
+function collectAliasIds(target: Set<string>, aliases: unknown) {
+	if (!aliases) return;
+	if (typeof aliases !== 'object') return;
+	if (aliases === null) return;
+	if (!('type' in aliases)) return;
+	if (aliases.type !== 'VARIABLE_ALIAS') return;
+	if (!('id' in aliases)) return;
+	if (typeof aliases.id !== 'string') return;
+
+	target.add((aliases as VariableAlias).id); // 여전히 타입 단언 필요
+}
+```
+
+**좋은 예** - Zod 스키마를 단일 진리의 원천으로:
+
+```typescript
+// ✅ 스키마 선언 → 타입 생성 → 통합 검증
+import { z } from 'zod';
+
+// 1. 스키마 선언
+const variableAliasSchema = z.object({
+	type: z.literal('VARIABLE_ALIAS'),
+	id: z.string(),
+});
+
+// 2. 스키마에서 타입 생성
+type VariableAlias = z.infer<typeof variableAliasSchema>;
+
+// 3. 검증에 스키마 사용 (방어 코드 불필요)
+function collectAliasIds(target: Set<string>, aliases: unknown) {
+	const result = variableAliasSchema.safeParse(aliases);
+	if (result.success) {
+		target.add(result.data.id); // 완전히 타입화됨, 단언 불필요
+	}
+}
+```
+
+**좋은 예** - TypeScript가 타입을 보장할 때는 타입 시스템 신뢰:
+
+```typescript
+// ✅ 깔끔하고 타입 안전
+function processFills(fills: Paint[] | undefined): NormalizedFill[] {
+	if (!fills) return [];
+
+	return fills
+		.filter((fill) => fill.visible !== false)
+		.map(normalizePaint)
+		.filter((fill): fill is NormalizedFill => fill !== null);
+}
+```
+
+**Zod를 사용해야 하는 경우**:
+
+- 중첩 구조를 가진 복잡한 타입 (타입 정의 소스로 스키마 사용)
+- `boundVariables` 파싱 (Figma API의 unknown 구조)
+- 5개 이상의 방어 if-check를 작성하려고 할 때
+
+**타입을 신뢰해야 하는 경우**:
+
+- 코드베이스 내부의 함수 호출
+- Extract 단계에서 이미 검증된 데이터
+- `@figma/plugin-typings`에 의해 보장되는 속성
 
 ## 설계 원칙
 
@@ -314,6 +497,27 @@ src/main/
 - 레이아웃: container/child 명확히 분리
 - 텍스트: 문자 범위별 runs로 분해
 
+### 6. 변수 해석 시스템
+
+**VariableRegistry** (`src/main/pipeline/variables/registry.ts`):
+- VariableAlias를 전체 TokenRef로 해석
+- `figma.variables.getVariableByIdAsync()` 호출
+- name, collectionId, collectionName, modeId, modeName 추출
+- 성능을 위한 캐싱 제공
+
+사용처:
+- `buildTokenRefs()` - 수집된 모든 variable ID 해석
+
+### 7. 스키마 검증
+
+**위치**: `src/main/pipeline/shared/schemas.ts`
+
+타입 정의와 검증기 역할을 모두 수행하는 Zod 스키마 정의:
+- `variableAliasSchema` - VariableAlias용 스키마 (`z.infer`로 타입 도출)
+- `tokenizedValueSchema` - TokenizedValue용 스키마 (`z.infer`로 타입 도출)
+
+이 스키마들은 장황한 TypeScript 타입 정의와 방어 코드를 대체합니다.
+
 ## 새 기능 추가 절차
 
 ### 새 스타일 속성 추가
@@ -349,3 +553,13 @@ src/main/
 - **빌드 도구**: [Plugma](https://plugma.dev/docs) (Vite 기반)
 - **Figma API**: https://www.figma.com/plugin-docs/api/api-reference/
 - **Figma API Type** : node_modules/@figma/plugin-typings
+
+## 추가 문서
+
+상세한 기술 레퍼런스는 `docs/` 폴더를 참고하세요:
+
+- **아키텍처 플로우** (`docs/architecture-flow.md`) - `buildNodeTree()`부터 Extract/Normalize 단계를 거쳐 최종 ReactNode 출력까지의 전체 데이터 흐름을 시각화한 다이어그램. **다음 경우 참고**: 전체 파이프라인이 어떻게 작동하는지 end-to-end로 이해할 때.
+
+- **Figma boundVariables 가이드** (`docs/figma-bound-variables.md`) - Figma Plugin API에서 Variable 바인딩을 읽는 방법에 대한 종합 가이드. 모든 바인딩 가능한 필드와 코드 예시 포함. **다음 경우 참고**: 디자인 토큰, 변수 바인딩 작업 시 또는 새로운 변수 인식 기능 구현 시.
+
+- **Figma 스타일 타입 해석 규칙** (`docs/figma-style-type.md`) - 공식 타입 정의를 기반으로 한 Figma Plugin API 타입(Paint, Effect, Stroke, Text, Layout) 해석 규칙. **다음 경우 참고**: 새로운 스타일 속성 추가, mixed 값 이해, 타입 관련 이슈 해결 시.

@@ -232,6 +232,19 @@ type Paint = SolidPaint | GradientPaint | ImagePaint | VideoPaint | PatternPaint
 - `fills`는 `Paint[]` 또는 `figma.mixed`일 수 있다. mixed면 세그먼트/선택 분리 처리 필요.
 - `boundVariables`가 있으면 필드별 변수 바인딩을 유지한다.
 
+### 현재 구현 상태
+
+⚠️ **구현 완료**:
+- ✅ `SolidPaint` → `NormalizedSolidFill`
+- ✅ `GradientPaint` (LINEAR, RADIAL, ANGULAR, DIAMOND) → `NormalizedGradientFill`
+- ✅ `ImagePaint` → `NormalizedImageFill`
+- ✅ `VideoPaint` → `NormalizedImageFill` (ImagePaint와 동일한 구조로 처리)
+
+⚠️ **미구현** (향후 추가 예정):
+- ❌ `PatternPaint` - 패턴 fill은 현재 처리되지 않음 (normalizePaint()에서 null 반환)
+
+미구현된 Paint 타입(PatternPaint)을 가진 노드는 Extract 단계에서는 수집되지만, Normalize 단계에서 null을 반환하여 배열에서 제외됩니다.
+
 ---
 
 ## Stroke / Geometry / Corner

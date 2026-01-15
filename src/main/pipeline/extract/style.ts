@@ -1,11 +1,11 @@
-import { variableAliasSchema } from '../shared/schemas';
-import { extractEffectProps } from './effects';
-import { extractFillProps } from './fills';
-import { extractAutoLayout } from './layout';
-import { extractStrokeProps } from './stroke';
-import { extractTextProps } from './text';
 import type { ExtractedTextProps } from './text';
 import type { ExtractedBoundVariables, ExtractedStyle } from './types';
+import { variableAliasSchema } from '../shared/schemas';
+import { effectsExtractor } from './effects';
+import { fillExtractor } from './fills';
+import { layoutExtractor } from './layout';
+import { strokeExtractor } from './stroke';
+import { textExtractor } from './text';
 
 const toSortedArray = (values: Set<string>) => Array.from(values).sort();
 
@@ -59,6 +59,20 @@ const collectPaintsBoundVariables = (
 		collectPaintBoundVariables(target, paints[index]);
 	}
 };
+
+const collectExtractedFillsBoundVariables = (
+	target: Set<string>,
+	fills: import('./fills').ExtractedFillProps['fills'],
+) => {
+	if (!fills) return;
+	if (fills.type === 'uniform') {
+		collectPaintsBoundVariables(target, fills.value);
+	} else if (fills.type === 'range') {
+		for (const seg of fills.segments) {
+			collectPaintsBoundVariables(target, seg.value);
+		}
+	}
+};
 const collectEffectsBoundVariables = (target: Set<string>, effects: ReadonlyArray<Effect> | undefined) => {
 	if (!effects) return;
 	for (const effect of effects) {
@@ -96,12 +110,14 @@ const collectComponentPropsBoundVariables = (target: Set<string>, node: SceneNod
 };
 
 const collectTextBoundVariables = (target: Set<string>, text: ExtractedTextProps) => {
-	if ('boundVariables' in text) {
-		collectAliasIds(target, text.boundVariables);
+	// Node-level boundVariables (now Uniform-wrapped)
+	if (text.boundVariables?.value) {
+		collectAliasIds(target, text.boundVariables.value);
 	}
 
-	if ('fills' in text) {
-		collectPaintsBoundVariables(target, text.fills);
+	// Node-level fills (now Uniform-wrapped)
+	if (text.fills?.value) {
+		collectPaintsBoundVariables(target, text.fills.value);
 	}
 
 	const { characters } = text;
@@ -111,17 +127,21 @@ const collectTextBoundVariables = (target: Set<string>, text: ExtractedTextProps
 		const segment = characters[index];
 		if (!segment || typeof segment !== 'object') continue;
 
-		if ('boundVariables' in segment) {
-			collectAliasIds(target, segment.boundVariables);
+		// Segment boundVariables (Uniform-wrapped)
+		if (segment.boundVariables?.value) {
+			collectAliasIds(target, segment.boundVariables.value);
 		}
-		if ('fills' in segment) {
-			collectPaintsBoundVariables(target, segment.fills);
+		// Segment fills (Uniform-wrapped)
+		if (segment.fills?.value) {
+			collectPaintsBoundVariables(target, segment.fills.value);
 		}
 	}
 };
 
 const addSetValues = (target: Set<string>, source: Set<string>) => {
-	source.forEach((value) => target.add(value));
+	source.forEach((value) => {
+		target.add(value);
+	});
 };
 
 const collectBoundVariables = (
@@ -137,9 +157,13 @@ const collectBoundVariables = (
 	const componentProps = new Set<string>();
 
 	collectNodeBoundVariables(nodeBound, node);
-	collectPaintsBoundVariables(fills, style.fills.fills);
-	collectEffectsBoundVariables(effects, style.effects.effects);
-	collectPaintsBoundVariables(stroke, style.stroke.strokes);
+	collectExtractedFillsBoundVariables(fills, style.fills.fills);
+	if (style.effects.effects) {
+		collectEffectsBoundVariables(effects, style.effects.effects.value);
+	}
+	if (style.stroke.strokes?.value) {
+		collectPaintsBoundVariables(stroke, style.stroke.strokes.value);
+	}
 	collectTextBoundVariables(text, style.text);
 	collectLayoutGridBoundVariables(layoutGrids, node);
 	collectComponentPropsBoundVariables(componentProps, node);
@@ -167,23 +191,35 @@ const collectBoundVariables = (
 	};
 };
 
-export const extractStyle = (node: SceneNode): ExtractedStyle => {
-	const fills = extractFillProps(node);
-	const effects = extractEffectProps(node);
-	const layout = extractAutoLayout(node);
-	const text = extractTextProps(node);
-	const stroke = extractStrokeProps(node);
-	const boundVariables = collectBoundVariables(node, { fills, effects, stroke, text });
-	const nodeBoundVariables = 'boundVariables' in node ? node.boundVariables : undefined;
+export class StyleExtractor {
+	constructor(
+		private readonly fills = fillExtractor,
+		private readonly effects = effectsExtractor,
+		private readonly layout = layoutExtractor,
+		private readonly text = textExtractor,
+		private readonly stroke = strokeExtractor,
+	) {}
 
-	return {
-		nodeType: node.type,
-		fills,
-		effects,
-		layout,
-		text,
-		stroke,
-		boundVariables,
-		nodeBoundVariables,
-	};
-};
+	extract(node: SceneNode): ExtractedStyle {
+		const fills = this.fills.extract(node);
+		const effects = this.effects.extract(node);
+		const layout = this.layout.extract(node);
+		const text = this.text.extract(node);
+		const stroke = this.stroke.extract(node);
+		const boundVariables = collectBoundVariables(node, { fills, effects, stroke, text });
+		const nodeBoundVariables = 'boundVariables' in node ? node.boundVariables : undefined;
+
+		return {
+			nodeType: node.type,
+			fills,
+			effects,
+			layout,
+			text,
+			stroke,
+			boundVariables,
+			nodeBoundVariables,
+		};
+	}
+}
+
+export const styleExtractor = new StyleExtractor();

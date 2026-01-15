@@ -1,88 +1,171 @@
-import { deepPick } from '../../utils';
-export const STROKE_KEYS = [
-	'strokes',
-	'strokeStyleId',
-	'strokeWeight',
-	'strokeJoin',
-	'strokeAlign',
-	'dashPattern',
-	'strokeGeometry',
-] satisfies ReadonlyArray<keyof MinimalStrokesMixin>;
+import type {
+	Uniform,
+	FigmaFieldType,
+	ExtractedCornerRadius,
+	ExtractedStrokeWeight,
+	ExtractedStrokeCap,
+	ExtractedStrokeJoin,
+} from './value-types';
 
-export const INDIVIDUAL_STROKE_KEYS = [
-	'strokeTopWeight',
-	'strokeBottomWeight',
-	'strokeLeftWeight',
-	'strokeRightWeight',
-] satisfies ReadonlyArray<keyof IndividualStrokesMixin>;
-
-export const GEOMETRY_STROKE_KEYS = ['strokeCap', 'strokeMiterLimit'] satisfies ReadonlyArray<keyof GeometryMixin>;
-
-export const CORNER_KEYS = ['cornerRadius', 'cornerSmoothing'] satisfies ReadonlyArray<keyof CornerMixin>;
-
-export const RECTANGLE_CORNER_KEYS = [
-	'topLeftRadius',
-	'topRightRadius',
-	'bottomLeftRadius',
-	'bottomRightRadius',
-] satisfies ReadonlyArray<keyof RectangleCornerMixin>;
-
-export const VECTOR_NETWORK_KEYS = ['vectorNetwork'] satisfies ReadonlyArray<keyof VectorNode>;
-
-type StrokeKeys =
-	| (typeof STROKE_KEYS)[number]
-	| (typeof INDIVIDUAL_STROKE_KEYS)[number]
-	| (typeof GEOMETRY_STROKE_KEYS)[number]
-	| (typeof CORNER_KEYS)[number]
-	| (typeof RECTANGLE_CORNER_KEYS)[number]
-	| (typeof VECTOR_NETWORK_KEYS)[number];
-
-export type ExtractedStrokeProps = Partial<
-	Pick<
-		MinimalStrokesMixin & IndividualStrokesMixin & GeometryMixin & CornerMixin & RectangleCornerMixin & VectorNode,
-		StrokeKeys
-	>
->;
-
-const hasMinimalStrokesMixin = (node: SceneNode): node is SceneNode & MinimalStrokesMixin => 'strokes' in node;
-
-const hasIndividualStrokesMixin = (node: SceneNode): node is SceneNode & IndividualStrokesMixin =>
-	'strokeTopWeight' in node;
-
-const hasGeometryStrokeMixin = (node: SceneNode): node is SceneNode & GeometryMixin => 'strokeCap' in node;
-
-const hasCornerMixin = (node: SceneNode): node is SceneNode & CornerMixin => 'cornerRadius' in node;
-
-const hasRectangleCornerMixin = (node: SceneNode): node is SceneNode & RectangleCornerMixin => 'topLeftRadius' in node;
-
-const hasVectorNetwork = (node: SceneNode): node is SceneNode & VectorNode => 'vectorNetwork' in node;
-
-export const extractStrokeProps = (node: SceneNode): ExtractedStrokeProps => {
-	const result: ExtractedStrokeProps = {};
-
-	if (hasMinimalStrokesMixin(node)) {
-		Object.assign(result, deepPick(node, STROKE_KEYS));
-	}
-
-	if (hasIndividualStrokesMixin(node)) {
-		Object.assign(result, deepPick(node, INDIVIDUAL_STROKE_KEYS));
-	}
-
-	if (hasGeometryStrokeMixin(node)) {
-		Object.assign(result, deepPick(node, GEOMETRY_STROKE_KEYS));
-	}
-
-	if (hasCornerMixin(node)) {
-		Object.assign(result, deepPick(node, CORNER_KEYS));
-	}
-
-	if (hasRectangleCornerMixin(node)) {
-		Object.assign(result, deepPick(node, RECTANGLE_CORNER_KEYS));
-	}
-
-	if (hasVectorNetwork(node)) {
-		Object.assign(result, deepPick(node, VECTOR_NETWORK_KEYS));
-	}
-
-	return result;
+export type ExtractedStrokeProps = {
+	strokes?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'strokes'>>;
+	strokeStyleId?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'strokeStyleId'>>;
+	strokeAlign?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'strokeAlign'>>;
+	dashPattern?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'dashPattern'>>;
+	strokeGeometry?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'strokeGeometry'>>;
+	strokeMiterLimit?: Uniform<FigmaFieldType<GeometryMixin, 'strokeMiterLimit'>>;
+	cornerSmoothing?: Uniform<FigmaFieldType<CornerMixin, 'cornerSmoothing'>>;
+	vectorNetwork?: Uniform<FigmaFieldType<VectorNode, 'vectorNetwork'>>;
+	strokeWeight?: ExtractedStrokeWeight;
+	cornerRadius?: ExtractedCornerRadius;
+	strokeCap?: ExtractedStrokeCap;
+	strokeJoin?: ExtractedStrokeJoin;
 };
+
+export class StrokeExtractor {
+	extract(node: SceneNode): ExtractedStrokeProps {
+		const result: ExtractedStrokeProps = {};
+
+		if (this.hasMinimalStrokesMixin(node)) {
+			result.strokes = this.uniform(node.strokes);
+			result.strokeStyleId = this.uniform(node.strokeStyleId);
+			result.strokeAlign = this.uniform(node.strokeAlign);
+			result.dashPattern = this.uniform(node.dashPattern);
+			result.strokeGeometry = this.uniform(node.strokeGeometry);
+		}
+
+		if (this.hasGeometryStrokeMixin(node)) {
+			result.strokeMiterLimit = this.uniform(node.strokeMiterLimit);
+		}
+
+		if (this.hasCornerMixin(node)) {
+			result.cornerSmoothing = this.uniform(node.cornerSmoothing);
+		}
+
+		if (this.hasVectorNetwork(node)) {
+			result.vectorNetwork = this.uniform(node.vectorNetwork);
+		}
+
+		result.strokeWeight = this.extractStrokeWeight(node);
+		result.cornerRadius = this.extractCornerRadius(node);
+		result.strokeCap = this.extractStrokeCap(node);
+		result.strokeJoin = this.extractStrokeJoin(node);
+		return result;
+	}
+
+	private uniform<T>(value: T): Uniform<T> {
+		return { type: 'uniform', value };
+	}
+
+	private extractCornerRadius(node: SceneNode): ExtractedCornerRadius | undefined {
+		if (!this.hasCornerMixin(node)) return undefined;
+
+		const radius = node.cornerRadius;
+		if (radius === figma.mixed) {
+			if (this.hasRectangleCornerMixin(node)) {
+				console.log({
+					topLeft: node.topLeftRadius,
+					topRight: node.topRightRadius,
+					bottomRight: node.bottomRightRadius,
+					bottomLeft: node.bottomLeftRadius,
+				});
+				return {
+					type: 'corner',
+					topLeft: node.topLeftRadius,
+					topRight: node.topRightRadius,
+					bottomRight: node.bottomRightRadius,
+					bottomLeft: node.bottomLeftRadius,
+				};
+			}
+			console.error('Unexpected: cornerRadius is mixed but no RectangleCornerMixin');
+			return { type: 'uniform', value: 0 };
+		}
+
+		return { type: 'uniform', value: radius };
+	}
+
+	private extractStrokeWeight(node: SceneNode): ExtractedStrokeWeight | undefined {
+		if (!this.hasMinimalStrokesMixin(node)) return undefined;
+
+		const weight = node.strokeWeight;
+		if (weight === figma.mixed) {
+			if (this.hasIndividualStrokesMixin(node)) {
+				return {
+					type: 'side',
+					top: node.strokeTopWeight,
+					right: node.strokeRightWeight,
+					bottom: node.strokeBottomWeight,
+					left: node.strokeLeftWeight,
+				};
+			}
+			console.error('Unexpected: strokeWeight is mixed but no IndividualStrokesMixin');
+			return { type: 'uniform', value: 0 };
+		}
+
+		return { type: 'uniform', value: weight };
+	}
+
+	private extractStrokeCap(node: SceneNode): ExtractedStrokeCap | undefined {
+		if (!this.hasGeometryStrokeMixin(node)) return undefined;
+
+		const cap = node.strokeCap;
+		if (cap === figma.mixed) {
+			if (this.hasVectorNetwork(node) && node.vectorNetwork) {
+				const vertices = node.vectorNetwork.vertices.map((v, index) => ({
+					index,
+					value: v.strokeCap ?? 'NONE',
+				}));
+				return { type: 'vertex', vertices };
+			}
+			console.error('Unexpected: strokeCap is mixed but no vectorNetwork');
+			return { type: 'uniform', value: 'NONE' };
+		}
+
+		return { type: 'uniform', value: cap };
+	}
+
+	private extractStrokeJoin(node: SceneNode): ExtractedStrokeJoin | undefined {
+		if (!this.hasMinimalStrokesMixin(node)) return undefined;
+
+		const join = node.strokeJoin;
+		if (join === figma.mixed) {
+			if (this.hasVectorNetwork(node) && node.vectorNetwork) {
+				const vertices = node.vectorNetwork.vertices.map((v, index) => ({
+					index,
+					value: v.strokeJoin ?? 'MITER',
+				}));
+				return { type: 'vertex', vertices };
+			}
+			console.error('Unexpected: strokeJoin is mixed but no vectorNetwork');
+			return { type: 'uniform', value: 'MITER' };
+		}
+
+		return { type: 'uniform', value: join };
+	}
+
+	private hasMinimalStrokesMixin(node: SceneNode): node is SceneNode & MinimalStrokesMixin {
+		return 'strokes' in node;
+	}
+
+	private hasIndividualStrokesMixin(node: SceneNode): node is SceneNode & IndividualStrokesMixin {
+		return 'strokeTopWeight' in node;
+	}
+
+	private hasGeometryStrokeMixin(node: SceneNode): node is SceneNode & GeometryMixin {
+		return 'strokeCap' in node;
+	}
+
+	private hasCornerMixin(node: SceneNode): node is SceneNode & CornerMixin {
+		return 'cornerRadius' in node;
+	}
+
+	private hasRectangleCornerMixin(node: SceneNode): node is SceneNode & RectangleCornerMixin {
+		return 'topLeftRadius' in node;
+	}
+
+	private hasVectorNetwork(node: SceneNode): node is SceneNode & VectorNode {
+		return 'vectorNetwork' in node;
+	}
+}
+
+export const strokeExtractor = new StrokeExtractor();

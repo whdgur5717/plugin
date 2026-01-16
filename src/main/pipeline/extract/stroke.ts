@@ -1,11 +1,4 @@
-import type {
-	Uniform,
-	FigmaFieldType,
-	ExtractedCornerRadius,
-	ExtractedStrokeWeight,
-	ExtractedStrokeCap,
-	ExtractedStrokeJoin,
-} from './value-types';
+import type { Uniform, FigmaFieldType, ExtractedStrokeWeight, ExtractedStrokeCap, ExtractedStrokeJoin } from './value-types';
 
 export type ExtractedStrokeProps = {
 	strokes?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'strokes'>>;
@@ -14,10 +7,8 @@ export type ExtractedStrokeProps = {
 	dashPattern?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'dashPattern'>>;
 	strokeGeometry?: Uniform<FigmaFieldType<MinimalStrokesMixin, 'strokeGeometry'>>;
 	strokeMiterLimit?: Uniform<FigmaFieldType<GeometryMixin, 'strokeMiterLimit'>>;
-	cornerSmoothing?: Uniform<FigmaFieldType<CornerMixin, 'cornerSmoothing'>>;
 	vectorNetwork?: Uniform<FigmaFieldType<VectorNode, 'vectorNetwork'>>;
 	strokeWeight?: ExtractedStrokeWeight;
-	cornerRadius?: ExtractedCornerRadius;
 	strokeCap?: ExtractedStrokeCap;
 	strokeJoin?: ExtractedStrokeJoin;
 };
@@ -38,16 +29,11 @@ export class StrokeExtractor {
 			result.strokeMiterLimit = this.uniform(node.strokeMiterLimit);
 		}
 
-		if (this.hasCornerMixin(node)) {
-			result.cornerSmoothing = this.uniform(node.cornerSmoothing);
-		}
-
 		if (this.hasVectorNetwork(node)) {
 			result.vectorNetwork = this.uniform(node.vectorNetwork);
 		}
 
 		result.strokeWeight = this.extractStrokeWeight(node);
-		result.cornerRadius = this.extractCornerRadius(node);
 		result.strokeCap = this.extractStrokeCap(node);
 		result.strokeJoin = this.extractStrokeJoin(node);
 		return result;
@@ -55,33 +41,6 @@ export class StrokeExtractor {
 
 	private uniform<T>(value: T): Uniform<T> {
 		return { type: 'uniform', value };
-	}
-
-	private extractCornerRadius(node: SceneNode): ExtractedCornerRadius | undefined {
-		if (!this.hasCornerMixin(node)) return undefined;
-
-		const radius = node.cornerRadius;
-		if (radius === figma.mixed) {
-			if (this.hasRectangleCornerMixin(node)) {
-				console.log({
-					topLeft: node.topLeftRadius,
-					topRight: node.topRightRadius,
-					bottomRight: node.bottomRightRadius,
-					bottomLeft: node.bottomLeftRadius,
-				});
-				return {
-					type: 'corner',
-					topLeft: node.topLeftRadius,
-					topRight: node.topRightRadius,
-					bottomRight: node.bottomRightRadius,
-					bottomLeft: node.bottomLeftRadius,
-				};
-			}
-			console.error('Unexpected: cornerRadius is mixed but no RectangleCornerMixin');
-			return { type: 'uniform', value: 0 };
-		}
-
-		return { type: 'uniform', value: radius };
 	}
 
 	private extractStrokeWeight(node: SceneNode): ExtractedStrokeWeight | undefined {
@@ -153,14 +112,6 @@ export class StrokeExtractor {
 
 	private hasGeometryStrokeMixin(node: SceneNode): node is SceneNode & GeometryMixin {
 		return 'strokeCap' in node;
-	}
-
-	private hasCornerMixin(node: SceneNode): node is SceneNode & CornerMixin {
-		return 'cornerRadius' in node;
-	}
-
-	private hasRectangleCornerMixin(node: SceneNode): node is SceneNode & RectangleCornerMixin {
-		return 'topLeftRadius' in node;
 	}
 
 	private hasVectorNetwork(node: SceneNode): node is SceneNode & VectorNode {

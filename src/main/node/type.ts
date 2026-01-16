@@ -1,5 +1,6 @@
 import type { ExtractedBoundVariables } from '../pipeline/extract/types';
 import type {
+	NormalizedCorner,
 	NormalizedEffect,
 	NormalizedFill,
 	NormalizedLayout,
@@ -58,10 +59,13 @@ export type OutputNormalizedStroke = Omit<NormalizedStroke, 'paints'> & {
 	paints: NormalizedValue<Array<TokenizedValue<NormalizedFill>>>;
 };
 
+export type OutputNormalizedCorner = NormalizedCorner;
+
 export type OutputNormalizedStyle = {
 	fills: NormalizedValue<Array<TokenizedValue<NormalizedFill>>>;
 	effects: NormalizedValue<Array<TokenizedValue<NormalizedEffect>>>;
 	stroke: OutputNormalizedStroke | null;
+	corner: OutputNormalizedCorner | null;
 	layout: OutputNormalizedLayout;
 	text: NormalizedText | null;
 	visible?: TokenizedValue<boolean>;

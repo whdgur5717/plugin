@@ -1,6 +1,7 @@
 import type { ExtractedTextProps } from './text';
 import type { ExtractedBoundVariables, ExtractedStyle } from './types';
 import { variableAliasSchema } from '../shared/schemas';
+import { cornerExtractor } from './corner';
 import { effectsExtractor } from './effects';
 import { fillExtractor } from './fills';
 import { layoutExtractor } from './layout';
@@ -198,6 +199,7 @@ export class StyleExtractor {
 		private readonly layout = layoutExtractor,
 		private readonly text = textExtractor,
 		private readonly stroke = strokeExtractor,
+		private readonly corner = cornerExtractor,
 	) {}
 
 	extract(node: SceneNode): ExtractedStyle {
@@ -206,6 +208,7 @@ export class StyleExtractor {
 		const layout = this.layout.extract(node);
 		const text = this.text.extract(node);
 		const stroke = this.stroke.extract(node);
+		const corner = this.corner.extract(node);
 		const boundVariables = collectBoundVariables(node, { fills, effects, stroke, text });
 		const nodeBoundVariables = 'boundVariables' in node ? node.boundVariables : undefined;
 
@@ -216,6 +219,7 @@ export class StyleExtractor {
 			layout,
 			text,
 			stroke,
+			corner,
 			boundVariables,
 			nodeBoundVariables,
 		};

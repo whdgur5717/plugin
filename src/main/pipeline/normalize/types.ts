@@ -153,7 +153,6 @@ export type NormalizedStroke = {
 	join: NormalizedValue<StrokeJoin>;
 	dashPattern: readonly number[];
 	miterLimit: number;
-	corner?: NormalizedCorner | null;
 	vectorNetwork?: VectorNetwork;
 };
 
@@ -291,4 +290,5 @@ export type NormalizedStyle = {
 	layout: NormalizedLayout;
 	text: NormalizedText | null;
 	stroke: NormalizedStroke | null;
+	corner: NormalizedCorner | null;
 };

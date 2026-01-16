@@ -1,6 +1,7 @@
 import type { ExtractedTextProps } from '../pipeline/extract/text';
 import type { ExtractedBoundVariables, ExtractedStyle } from '../pipeline/extract/types';
 import type {
+	NormalizedCorner,
 	NormalizedEffect,
 	NormalizedFill,
 	NormalizedLayout,
@@ -17,6 +18,7 @@ import type {
 	InstanceRef,
 	OutputComponentProperties,
 	OutputLayoutGrid,
+	OutputNormalizedCorner,
 	OutputNormalizedLayout,
 	OutputNormalizedStroke,
 	OutputNormalizedStyle,
@@ -192,7 +194,11 @@ const resolveStrokeTokens = (
 			? stroke.paints.value.map((paint, index) => {
 					const resolved = resolveFillTokens(paint, tokenRefs);
 					const alias = getAliasFromArray(strokeAliases, index);
-					return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
+					// Only apply paint-level alias to solid paints (gradient/image have nested bindings)
+					if (alias && paint.type === 'solid') {
+						return toTokenizedValue(resolved, alias, tokenRefs);
+					}
+					return resolved;
 				})
 			: [];
 	const paints: NormalizedValue<Array<TokenizedValue<NormalizedFill>>> =
@@ -209,37 +215,39 @@ const resolveStrokeTokens = (
 					left: resolveTokenizedValue(stroke.weight.left, tokenRefs),
 				};
 
-	const corner = stroke.corner
-		? {
-				...stroke.corner,
-				radius:
-					stroke.corner.radius.type === 'uniform'
-						? {
-								type: 'uniform' as const,
-								value: resolveTokenizedValue(stroke.corner.radius.value, tokenRefs),
-							}
-						: stroke.corner.radius.type === 'mixed'
-							? {
-									type: 'mixed' as const,
-									values: stroke.corner.radius.values.map((value) =>
-										resolveTokenizedValue(value, tokenRefs),
-									),
-								}
-							: {
-									type: 'range-based' as const,
-									segments: stroke.corner.radius.segments.map((segment) => ({
-										...segment,
-										value: resolveTokenizedValue(segment.value, tokenRefs),
-									})),
-								},
-			}
-		: undefined;
-
 	return {
 		...stroke,
 		paints,
 		weight,
-		corner,
+	};
+};
+
+const resolveCornerTokens = (
+	corner: NormalizedCorner,
+	tokenRefs: Map<string, TokenRef>,
+): OutputNormalizedCorner => {
+	const radius =
+		corner.radius.type === 'uniform'
+			? {
+					type: 'uniform' as const,
+					value: resolveTokenizedValue(corner.radius.value, tokenRefs),
+				}
+			: corner.radius.type === 'mixed'
+				? {
+						type: 'mixed' as const,
+						values: corner.radius.values.map((value) => resolveTokenizedValue(value, tokenRefs)),
+					}
+				: {
+						type: 'range-based' as const,
+						segments: corner.radius.segments.map((segment) => ({
+							...segment,
+							value: resolveTokenizedValue(segment.value, tokenRefs),
+						})),
+					};
+
+	return {
+		...corner,
+		radius,
 	};
 };
 
@@ -333,6 +341,9 @@ const resolveTextTokens = (
 		const fillsAlias = getAliasFromArray(textRangeFills, index);
 
 		const resolvedFills = resolveFillsValue(run.style.fills, tokenRefs);
+		// Only apply fills alias if all fills are solid (gradient/image have nested bindings)
+		const fillsArray = unwrapTokenized(run.style.fills);
+		const allSolidFills = fillsArray.every((fill) => fill.type === 'solid');
 
 		return {
 			...run,
@@ -346,7 +357,7 @@ const resolveTextTokens = (
 				lineHeight: applyAliasToken(run.style.lineHeight, lineHeightAlias, tokenRefs),
 				paragraphIndent: applyAliasTokenOptional(run.style.paragraphIndent, paragraphIndentAlias, tokenRefs),
 				paragraphSpacing: applyAliasTokenOptional(run.style.paragraphSpacing, paragraphSpacingAlias, tokenRefs),
-				fills: fillsAlias ? applyAliasToken(resolvedFills, fillsAlias, tokenRefs) : resolvedFills,
+				fills: fillsAlias && allSolidFills ? applyAliasToken(resolvedFills, fillsAlias, tokenRefs) : resolvedFills,
 				textCase: resolveTokenizedValue(run.style.textCase, tokenRefs),
 				textDecoration: resolveTokenizedValue(run.style.textDecoration, tokenRefs),
 				textDecorationColor: resolveTokenizedValue(run.style.textDecorationColor, tokenRefs),
@@ -491,7 +502,11 @@ const enrichStyle = (
 			? normalizedStyle.fills.value.map((fill, index) => {
 					const resolved = resolveFillTokens(fill, tokenRefs);
 					const alias = getAliasFromArray(fillsAliases, index);
-					return alias ? toTokenizedValue(resolved, alias, tokenRefs) : resolved;
+					// Only apply fill-level alias to solid paints (gradient/image have nested bindings)
+					if (alias && fill.type === 'solid') {
+						return toTokenizedValue(resolved, alias, tokenRefs);
+					}
+					return resolved;
 				})
 			: [];
 	const fills: NormalizedValue<Array<TokenizedValue<NormalizedFill>>> =
@@ -516,6 +531,8 @@ const enrichStyle = (
 		? resolveStrokeTokens(normalizedStyle.stroke, strokeAliases, tokenRefs)
 		: null;
 
+	const corner = normalizedStyle.corner ? resolveCornerTokens(normalizedStyle.corner, tokenRefs) : null;
+
 	const layout = resolveLayoutTokens(normalizedStyle.layout, tokenRefs);
 	const layoutGrids = buildLayoutGrids(node, tokenRefs);
 	const text = normalizedStyle.text
@@ -533,6 +550,7 @@ const enrichStyle = (
 		fills,
 		effects,
 		stroke,
+		corner,
 		layout: layoutGrids ? { ...layout, layoutGrids } : layout,
 		text,
 		visible: visibleValue === undefined ? undefined : applyAliasToken(visibleValue, visibleAlias, tokenRefs),

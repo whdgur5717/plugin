@@ -1,3 +1,4 @@
+import type { ExtractedCornerProps } from './corner';
 import type { ExtractedEffectProps } from './effects';
 import type { ExtractedFillProps } from './fills';
 import type { ExtractedLayoutProps } from './layout';
@@ -24,6 +25,7 @@ export interface ExtractedStyle {
 	layout: ExtractedLayoutProps;
 	text: ExtractedTextProps;
 	stroke: ExtractedStrokeProps;
+	corner: ExtractedCornerProps;
 	boundVariables: ExtractedBoundVariables;
 	nodeBoundVariables?: SceneNode['boundVariables'];
 }

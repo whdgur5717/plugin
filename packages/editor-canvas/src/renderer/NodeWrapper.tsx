@@ -2,7 +2,7 @@ import "./NodeWrapper.css"
 
 import type { NodeData, Position, Size } from "@design-editor/core"
 import { Resizable } from "re-resizable"
-import { type ReactNode,useRef, useState } from "react"
+import { type ReactNode, useRef, useState } from "react"
 
 interface NodeWrapperProps {
 	node: NodeData
@@ -20,9 +20,20 @@ export function NodeWrapper({ node, isSelected, onSelect, onHover, onMove, onRes
 	const wrapperRef = useRef<HTMLDivElement>(null)
 
 	const style = node.style ?? {}
-	const width = (style.width as number) ?? "auto"
-	const height = (style.height as number) ?? "auto"
+	const width = style.width ?? "auto"
+	const height = style.height ?? "auto"
 	const isLocked = node.locked === true
+
+	// position 관련 스타일을 wrapper에 적용하여 선택 보더가 노드와 함께 이동하도록 함
+	const wrapperStyle: React.CSSProperties = {
+		position: style.position,
+		left: style.left,
+		top: style.top,
+		right: style.right,
+		bottom: style.bottom,
+		width,
+		height,
+	}
 
 	const handleMouseDown = (e: React.MouseEvent) => {
 		if (e.button !== 0) return
@@ -87,6 +98,7 @@ export function NodeWrapper({ node, isSelected, onSelect, onHover, onMove, onRes
 		<div
 			ref={wrapperRef}
 			className={`node-wrapper ${isSelected ? "selected" : ""} ${isDragging ? "dragging" : ""} ${isLocked ? "locked" : ""}`}
+			style={wrapperStyle}
 			onMouseDown={handleMouseDown}
 			onMouseEnter={() => onHover(true)}
 			onMouseLeave={() => onHover(false)}

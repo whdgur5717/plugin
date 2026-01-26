@@ -1,7 +1,8 @@
 import "./App.css"
 
-import { type Connection,connectToChild } from "penpal"
-import { useEffect, useRef, useState } from "react"
+import type { AsyncMethodReturns } from "penpal"
+import { connectToChild } from "penpal"
+import { useEffect, useRef } from "react"
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 
 import { LayersPanel } from "./components/LayersPanel"
@@ -13,9 +14,7 @@ import { useEditorStore } from "./store/editor"
 
 export function App() {
 	const iframeRef = useRef<HTMLIFrameElement>(null)
-	const [connection, setConnection] = useState<Connection<CanvasMethods> | null>(null)
-	const document = useEditorStore((state) => state.document)
-	const components = useEditorStore((state) => state.components)
+	const canvasRef = useRef<AsyncMethodReturns<CanvasMethods> | null>(null)
 
 	// 키보드 단축키 활성화
 	useKeyboardShortcuts()
@@ -23,7 +22,7 @@ export function App() {
 	useEffect(() => {
 		if (!iframeRef.current) return
 
-		const conn = connectToChild<CanvasMethods>({
+		const canvasConnection = connectToChild<CanvasMethods>({
 			iframe: iframeRef.current,
 			methods: {
 				onNodeClicked(id: string, shiftKey: boolean) {
@@ -45,24 +44,33 @@ export function App() {
 			},
 		})
 
-		conn.promise.then((child) => {
-			setConnection(conn)
+		canvasConnection.promise.then((child) => {
+			canvasRef.current = child
 			// 초기 상태 동기화
-			child.syncState(document, components)
+			const state = useEditorStore.getState()
+			child.syncState({
+				document: state.document,
+				components: state.components,
+				zoom: state.zoom,
+				selection: state.selection,
+			})
+		})
+
+		// store 변경 시 Canvas에 동기화
+		const unsubscribe = useEditorStore.subscribe((state) => {
+			canvasRef.current?.syncState({
+				document: state.document,
+				components: state.components,
+				zoom: state.zoom,
+				selection: state.selection,
+			})
 		})
 
 		return () => {
-			conn.destroy()
+			unsubscribe()
+			canvasConnection.destroy()
 		}
 	}, [])
-
-	// 문서/컴포넌트 변경 시 캔버스에 동기화
-	useEffect(() => {
-		if (!connection) return
-		connection.promise.then((child) => {
-			child.syncState(document, components)
-		})
-	}, [document, components, connection])
 
 	return (
 		<div className="app">

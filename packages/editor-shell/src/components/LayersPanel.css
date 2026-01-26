@@ -1,0 +1,130 @@
+.layers-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #252525;
+}
+
+.panel-header {
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b3b3b3;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.layers-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.layer-item {
+  user-select: none;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding-right: 8px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.layer-row:hover,
+.layer-row.hovered {
+  background-color: #2d2d2d;
+}
+
+.layer-row.selected {
+  background-color: #0d99ff33;
+}
+
+.layer-row.selected:hover {
+  background-color: #0d99ff44;
+}
+
+.layer-row.hidden-layer {
+  opacity: 0.5;
+}
+
+.layer-row.root-layer {
+  font-weight: 600;
+}
+
+.layer-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.layer-collapse-btn:hover:not(:disabled) {
+  color: #999;
+}
+
+.layer-collapse-btn:disabled {
+  cursor: default;
+}
+
+.layer-name {
+  flex: 1;
+  font-size: 12px;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: grab;
+}
+
+.layer-name:active {
+  cursor: grabbing;
+}
+
+.layer-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.layer-row:hover .layer-actions {
+  opacity: 1;
+}
+
+.layer-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 2px;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.layer-action-btn:hover {
+  background-color: #3d3d3d;
+}
+
+.layer-action-btn.active {
+  color: #0d99ff;
+}
+
+.layer-children {
+  /* No extra styles needed */
+}

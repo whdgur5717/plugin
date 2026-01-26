@@ -1,5 +1,5 @@
 import { getComponent } from "@design-editor/components"
-import type { ComponentDefinition, DocumentNode, InstanceNode,NodeData, Position, Size } from "@design-editor/core"
+import type { ComponentDefinition, DocumentNode, InstanceNode, NodeData, Position, Size } from "@design-editor/core"
 
 import { NodeWrapper } from "./NodeWrapper"
 
@@ -118,17 +118,23 @@ function renderNode(
 
 	const Component = getComponent(node.type)
 
+	// position 스타일은 NodeWrapper에서 적용하므로 컴포넌트에서는 제외
+	// width/height도 wrapper에 적용되므로 100%로 채움
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { position, left, top, right, bottom, width, height, ...restStyle } = node.style ?? {}
+	const contentStyle = { ...restStyle, width: "100%", height: "100%" }
+
 	if (!Component) {
 		// 컴포넌트가 없으면 기본 div로 렌더링
 		return (
-			<div style={node.style}>
+			<div style={contentStyle}>
 				{renderChildren(node.children, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
 			</div>
 		)
 	}
 
 	return (
-		<Component style={node.style} {...node.props}>
+		<Component style={contentStyle} {...node.props}>
 			{renderChildren(node.children, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
 		</Component>
 	)

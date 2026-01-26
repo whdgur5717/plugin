@@ -1,0 +1,189 @@
+import type { NodeData, DocumentNode, Position, Size, ComponentDefinition, InstanceNode } from '@design-editor/core';
+import { getComponent } from '@design-editor/components';
+import { NodeWrapper } from './NodeWrapper';
+
+interface CanvasRendererProps {
+  document: DocumentNode;
+  components: ComponentDefinition[];
+  selectedIds: string[];
+  onNodeClick: (id: string, shiftKey: boolean) => void;
+  onNodeHover: (id: string | null) => void;
+  onNodeMove: (id: string, position: Position) => void;
+  onNodeResize: (id: string, size: Size) => void;
+}
+
+export function CanvasRenderer({
+  document,
+  components,
+  selectedIds,
+  onNodeClick,
+  onNodeHover,
+  onNodeMove,
+  onNodeResize,
+}: CanvasRendererProps) {
+  return (
+    <NodeWrapper
+      node={document}
+      isSelected={selectedIds.includes(document.id)}
+      onSelect={(shiftKey) => onNodeClick(document.id, shiftKey)}
+      onHover={(hovered) => onNodeHover(hovered ? document.id : null)}
+      onMove={(pos) => onNodeMove(document.id, pos)}
+      onResize={(size) => onNodeResize(document.id, size)}
+    >
+      {renderNode(document, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
+    </NodeWrapper>
+  );
+}
+
+/**
+ * 인스턴스인지 체크하는 타입 가드
+ */
+function isInstance(node: NodeData): node is InstanceNode {
+  return node.type === '__INSTANCE__';
+}
+
+/**
+ * 인스턴스 노드를 렌더링 - 컴포넌트 정의를 참조하여 렌더링
+ */
+function renderInstance(
+  instance: InstanceNode,
+  components: ComponentDefinition[],
+  selectedIds: string[],
+  onNodeClick: (id: string, shiftKey: boolean) => void,
+  onNodeHover: (id: string | null) => void,
+  onNodeMove: (id: string, position: Position) => void,
+  onNodeResize: (id: string, size: Size) => void
+): React.ReactNode {
+  const component = components.find((c) => c.id === instance.componentId);
+  if (!component) {
+    // 컴포넌트를 찾을 수 없으면 placeholder 렌더링
+    return (
+      <div style={{ ...instance.style, background: '#ff000033', border: '1px dashed red' }}>
+        Missing Component
+      </div>
+    );
+  }
+
+  // 컴포넌트 루트에 인스턴스 스타일 적용
+  const mergedRoot: NodeData = {
+    ...component.root,
+    style: { ...component.root.style, ...instance.style },
+  };
+
+  // 오버라이드 적용
+  const rootWithOverrides = applyOverrides(mergedRoot, instance.overrides);
+
+  return renderNode(
+    rootWithOverrides,
+    components,
+    selectedIds,
+    onNodeClick,
+    onNodeHover,
+    onNodeMove,
+    onNodeResize
+  );
+}
+
+/**
+ * 오버라이드 적용
+ */
+function applyOverrides(
+  node: NodeData,
+  overrides?: InstanceNode['overrides']
+): NodeData {
+  if (!overrides) return node;
+
+  const nodeOverride = overrides[node.id];
+  let result = node;
+
+  if (nodeOverride) {
+    result = {
+      ...node,
+      props: { ...node.props, ...nodeOverride.props },
+      style: { ...node.style, ...nodeOverride.style },
+      children: nodeOverride.children !== undefined ? nodeOverride.children : node.children,
+    };
+  }
+
+  // 자식에도 재귀적으로 오버라이드 적용
+  if (Array.isArray(result.children)) {
+    result = {
+      ...result,
+      children: result.children.map((child) => applyOverrides(child, overrides)),
+    };
+  }
+
+  return result;
+}
+
+function renderNode(
+  node: NodeData,
+  components: ComponentDefinition[],
+  selectedIds: string[],
+  onNodeClick: (id: string, shiftKey: boolean) => void,
+  onNodeHover: (id: string | null) => void,
+  onNodeMove: (id: string, position: Position) => void,
+  onNodeResize: (id: string, size: Size) => void
+): React.ReactNode {
+  // 인스턴스인 경우 컴포넌트 참조하여 렌더링
+  if (isInstance(node)) {
+    return renderInstance(
+      node,
+      components,
+      selectedIds,
+      onNodeClick,
+      onNodeHover,
+      onNodeMove,
+      onNodeResize
+    );
+  }
+
+  const Component = getComponent(node.type);
+
+  if (!Component) {
+    // 컴포넌트가 없으면 기본 div로 렌더링
+    return (
+      <div style={node.style}>
+        {renderChildren(node.children, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
+      </div>
+    );
+  }
+
+  return (
+    <Component style={node.style} {...node.props}>
+      {renderChildren(node.children, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
+    </Component>
+  );
+}
+
+function renderChildren(
+  children: NodeData['children'],
+  components: ComponentDefinition[],
+  selectedIds: string[],
+  onNodeClick: (id: string, shiftKey: boolean) => void,
+  onNodeHover: (id: string | null) => void,
+  onNodeMove: (id: string, position: Position) => void,
+  onNodeResize: (id: string, size: Size) => void
+): React.ReactNode {
+  if (!children) return null;
+
+  if (typeof children === 'string') {
+    return children;
+  }
+
+  return children
+    .filter((child) => child.visible !== false)
+    .map((child) => (
+      <NodeWrapper
+        key={child.id}
+        node={child}
+        isSelected={selectedIds.includes(child.id)}
+        onSelect={(shiftKey) => onNodeClick(child.id, shiftKey)}
+        onHover={(hovered) => onNodeHover(hovered ? child.id : null)}
+        onMove={(pos) => onNodeMove(child.id, pos)}
+        onResize={(size) => onNodeResize(child.id, size)}
+      >
+        {renderNode(child, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
+      </NodeWrapper>
+    ));
+}

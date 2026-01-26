@@ -1,4 +1,4 @@
-import type { ComponentDefinition,DocumentNode, Position, Size } from "@design-editor/core"
+import type { ComponentDefinition, DocumentNode, Position, Size } from "@design-editor/core"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFunction = (...args: any[]) => any
@@ -8,12 +8,13 @@ type AnyFunction = (...args: any[]) => any
  */
 export interface CanvasMethods {
 	[key: string]: AnyFunction
-	/** 문서 상태 동기화 */
-	syncState: (document: DocumentNode, components: ComponentDefinition[]) => void
-	/** 노드 선택 */
-	selectNodes: (ids: string[]) => void
-	/** 줌 레벨 변경 */
-	setZoom: (zoom: number) => void
+	/** 전체 상태 동기화 */
+	syncState: (state: {
+		document: DocumentNode
+		components: ComponentDefinition[]
+		zoom: number
+		selection: string[]
+	}) => void
 }
 
 /**

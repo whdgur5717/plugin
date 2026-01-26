@@ -1,12 +1,11 @@
 import "./App.css"
-// primitives 등록
 import "@design-editor/components"
 
-import type { ComponentDefinition,DocumentNode, Position, Size } from "@design-editor/core"
-import { type AsyncMethodReturns,connectToParent } from "penpal"
-import { useEffect, useRef,useState } from "react"
+import type { ComponentDefinition, DocumentNode, Position, Size } from "@design-editor/core"
+import { type AsyncMethodReturns, connectToParent } from "penpal"
+import { useEffect, useRef, useState } from "react"
 
-import type { CanvasMethods,ShellMethods } from "./protocol/types"
+import type { ShellMethods } from "./protocol/types"
 import { CanvasRenderer } from "./renderer/CanvasRenderer"
 
 export function App() {
@@ -19,17 +18,13 @@ export function App() {
 	useEffect(() => {
 		const connection = connectToParent<ShellMethods>({
 			methods: {
-				syncState(doc: DocumentNode, comps: ComponentDefinition[]) {
-					setDocument(doc)
-					setComponents(comps)
+				syncState(state: { document: DocumentNode; components: ComponentDefinition[]; zoom: number; selection: string[] }) {
+					setDocument(state.document)
+					setComponents(state.components)
+					setZoom(state.zoom)
+					setSelectedIds(state.selection)
 				},
-				selectNodes(ids: string[]) {
-					setSelectedIds(ids)
-				},
-				setZoom(z: number) {
-					setZoom(z)
-				},
-			} as CanvasMethods,
+			},
 		})
 
 		connection.promise.then((parent) => {

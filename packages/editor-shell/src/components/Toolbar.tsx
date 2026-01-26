@@ -2,6 +2,7 @@ import "./Toolbar.css"
 
 import type { EditorTool } from "@design-editor/core"
 import { useState } from "react"
+import { useShallow } from "zustand/react/shallow"
 
 import { useEditorStore } from "../store/editor"
 
@@ -13,15 +14,20 @@ const tools: { id: EditorTool; label: string; icon: string }[] = [
 ]
 
 export function Toolbar() {
-	const activeTool = useEditorStore((state) => state.activeTool)
-	const setActiveTool = useEditorStore((state) => state.setActiveTool)
-	const zoom = useEditorStore((state) => state.zoom)
-	const setZoom = useEditorStore((state) => state.setZoom)
-	const selection = useEditorStore((state) => state.selection)
-	const document = useEditorStore((state) => state.document)
-	const components = useEditorStore((state) => state.components)
-	const createComponent = useEditorStore((state) => state.createComponent)
-	const createInstance = useEditorStore((state) => state.createInstance)
+	const { activeTool, setActiveTool, zoom, setZoom, selection, document, components, createComponent, createInstance } =
+		useEditorStore(
+			useShallow((state) => ({
+				activeTool: state.activeTool,
+				setActiveTool: state.setActiveTool,
+				zoom: state.zoom,
+				setZoom: state.setZoom,
+				selection: state.selection,
+				document: state.document,
+				components: state.components,
+				createComponent: state.createComponent,
+				createInstance: state.createInstance,
+			})),
+		)
 
 	const [showComponentMenu, setShowComponentMenu] = useState(false)
 

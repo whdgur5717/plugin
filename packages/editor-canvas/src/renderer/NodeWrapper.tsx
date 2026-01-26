@@ -86,21 +86,6 @@ export function NodeWrapper({ node, isSelected, onSelect, onHover, onMove, onRes
 		window.addEventListener("mouseup", handleMouseUp)
 	}
 
-	const handleResizeStop = (
-		_e: MouseEvent | TouchEvent,
-		_direction: string,
-		_ref: HTMLElement,
-		d: { width: number; height: number },
-	) => {
-		const currentWidth = typeof width === "number" ? width : 0
-		const currentHeight = typeof height === "number" ? height : 0
-
-		onResize({
-			width: currentWidth + d.width,
-			height: currentHeight + d.height,
-		})
-	}
-
 	return (
 		<div
 			ref={wrapperRef}
@@ -112,8 +97,13 @@ export function NodeWrapper({ node, isSelected, onSelect, onHover, onMove, onRes
 		>
 			{isSelected && !isLocked ? (
 				<Resizable
-					size={{ width, height }}
-					onResizeStop={handleResizeStop}
+					defaultSize={{ width, height }}
+					onResizeStop={(_e, _direction, ref) => {
+						onResize({
+							width: ref.offsetWidth,
+							height: ref.offsetHeight,
+						})
+					}}
 					enable={{
 						top: true,
 						right: true,

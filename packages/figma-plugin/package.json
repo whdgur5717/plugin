@@ -7,21 +7,23 @@
 		"dev": "plugma dev",
 		"build": "plugma build",
 		"release": "plugma release",
-		"type-check": "tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p src/ui/tsconfig.json"
+		"lint": "eslint --fix .",
+		"type-check": "tsgo --noEmit -p src/main/tsconfig.json && tsgo --noEmit -p src/ui/tsconfig.json"
 	},
 	"devDependencies": {
+		"@design-editor/eslint-config": "workspace:*",
+		"@design-editor/tsconfig": "workspace:*",
 		"@figma/plugin-typings": "^1.100.2",
-		"@types/react": "^18.3.12",
-		"@types/react-dom": "^18.3.1",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
 		"@vitejs/plugin-react": "^4.3.3",
 		"plugma": "^2.2.3",
-		"typescript": "~5.6.2",
 		"vite": "^7.0.0"
 	},
 	"dependencies": {
 		"es-toolkit": "^1.43.0",
-		"react": "^18.3.1",
-		"react-dom": "^18.3.1",
+		"react": "catalog:",
+		"react-dom": "catalog:",
 		"zod": "^4.2.1"
 	}
 }

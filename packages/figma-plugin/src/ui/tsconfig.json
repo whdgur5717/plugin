@@ -17,5 +17,5 @@
 		"noUncheckedSideEffectImports": true,
 		"composite": true
 	},
-	"include": ["**/*.ts", "**/*.tsx", "../vite-env.d.ts", "../main/ex.ts"]
+	"include": ["**/*.ts", "**/*.tsx", "../vite-env.d.ts"]
 }

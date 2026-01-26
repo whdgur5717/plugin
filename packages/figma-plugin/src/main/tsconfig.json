@@ -3,7 +3,7 @@
 		"composite": true,
 		"module": "ESNext",
 		"moduleResolution": "bundler",
-		"typeRoots": ["../../node_modules/@figma", "../../node_modules/@types"],
+		"typeRoots": ["../../../node_modules/@figma", "../../../node_modules/@types"],
 		"strict": true,
 		"skipLibCheck": true,
 		"noUncheckedIndexedAccess": true,

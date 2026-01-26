@@ -1,7 +1,7 @@
 {
 	"documentAccess": "dynamic-page",
 	"api": "1.0.0",
-	"networkAccess": { "allowedDomains": ["none"] },
+	"networkAccess": { "allowedDomains": ["https://api.openai.com"] },
 	"id": "com.Plugin",
 	"name": "Plugin",
 	"main": "src/main/main.ts",

@@ -3,12 +3,15 @@
 	"type": "module",
 	"scripts": {
 		"format": "prettier --write .",
-		"lint": "pnpm -r run lint",
-		"type-check": "pnpm -r run type-check"
+		"lint": "pnpm -r run lint -- .",
+		"type-check": "pnpm -r run type-check",
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"@typescript/native-preview": "^7.0.0-dev.20260124.1",
 		"eslint": "^9.39.2",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.2.7",
 		"prettier": "latest",
 		"typescript": "~5.6.2",
 		"vitest": "^4.0.0"

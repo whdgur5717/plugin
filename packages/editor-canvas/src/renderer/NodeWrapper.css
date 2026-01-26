@@ -1,0 +1,95 @@
+.node-wrapper {
+  position: relative;
+  cursor: pointer;
+}
+
+.node-wrapper.selected {
+  outline: 2px solid #0d99ff;
+  outline-offset: -1px;
+}
+
+.node-wrapper.dragging {
+  cursor: grabbing;
+}
+
+.node-wrapper.locked {
+  cursor: not-allowed;
+}
+
+.node-wrapper.locked.selected {
+  outline-color: #ff6b6b;
+}
+
+.resize-handle {
+  position: absolute;
+  background-color: #0d99ff;
+}
+
+.resize-handle-n,
+.resize-handle-s {
+  height: 6px;
+  left: 0;
+  right: 0;
+}
+
+.resize-handle-n {
+  top: -3px;
+  cursor: ns-resize;
+}
+
+.resize-handle-s {
+  bottom: -3px;
+  cursor: ns-resize;
+}
+
+.resize-handle-e,
+.resize-handle-w {
+  width: 6px;
+  top: 0;
+  bottom: 0;
+}
+
+.resize-handle-e {
+  right: -3px;
+  cursor: ew-resize;
+}
+
+.resize-handle-w {
+  left: -3px;
+  cursor: ew-resize;
+}
+
+.resize-handle-ne,
+.resize-handle-se,
+.resize-handle-sw,
+.resize-handle-nw {
+  width: 8px;
+  height: 8px;
+  background-color: #ffffff;
+  border: 2px solid #0d99ff;
+  border-radius: 50%;
+}
+
+.resize-handle-ne {
+  top: -4px;
+  right: -4px;
+  cursor: nesw-resize;
+}
+
+.resize-handle-se {
+  bottom: -4px;
+  right: -4px;
+  cursor: nwse-resize;
+}
+
+.resize-handle-sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: nesw-resize;
+}
+
+.resize-handle-nw {
+  top: -4px;
+  left: -4px;
+  cursor: nwse-resize;
+}

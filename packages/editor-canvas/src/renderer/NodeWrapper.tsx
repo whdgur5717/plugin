@@ -1,6 +1,7 @@
 import "./NodeWrapper.css"
 
 import type { NodeData, Position, Size } from "@design-editor/core"
+import { toNumber } from "es-toolkit/compat"
 import { Resizable } from "re-resizable"
 import { type ReactNode, useRef, useState } from "react"
 
@@ -44,8 +45,14 @@ export function NodeWrapper({ node, isSelected, onSelect, onHover, onMove, onRes
 		// Locked nodes cannot be dragged
 		if (isLocked) return
 
-		const nodeX = (style.left as number) ?? 0
-		const nodeY = (style.top as number) ?? 0
+		// Don't start drag when clicking on resize handles
+		const target = e.target as HTMLElement
+		if (target.classList.contains("resize-handle") || target.closest(".resize-handle")) {
+			return
+		}
+
+		const nodeX = toNumber(style.left ?? 0)
+		const nodeY = toNumber(style.top ?? 0)
 
 		dragStartRef.current = {
 			x: e.clientX,

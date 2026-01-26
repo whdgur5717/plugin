@@ -10,10 +10,11 @@
 		"type-check": "tsgo --noEmit"
 	},
 	"dependencies": {
-		"@design-editor/core": "workspace:*",
 		"@design-editor/components": "workspace:*",
+		"@design-editor/core": "workspace:*",
 		"@dnd-kit/core": "^6.3.0",
 		"@dnd-kit/utilities": "^3.2.0",
+		"es-toolkit": "^1.43.0",
 		"penpal": "^6.2.0",
 		"re-resizable": "^6.11.0",
 		"react": "catalog:",

@@ -1,18 +1,4 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2020", "DOM"],
-    "jsx": "react-jsx",
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"]
+	"extends": "@design-editor/tsconfig/base.json",
+	"include": ["src/**/*"]
 }

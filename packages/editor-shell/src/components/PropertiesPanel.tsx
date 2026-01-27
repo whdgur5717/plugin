@@ -39,17 +39,13 @@ function DesignTab({ node }: { node: NodeData }) {
 						<span>X</span>
 						<input
 							type="number"
-							value={(style.left as number) ?? 0}
+							value={style.left ?? 0}
 							onChange={(e) => handleStyleChange("left", Number(e.target.value))}
 						/>
 					</label>
 					<label>
 						<span>Y</span>
-						<input
-							type="number"
-							value={(style.top as number) ?? 0}
-							onChange={(e) => handleStyleChange("top", Number(e.target.value))}
-						/>
+						<input type="number" value={style.top ?? 0} onChange={(e) => handleStyleChange("top", Number(e.target.value))} />
 					</label>
 				</div>
 			</section>
@@ -62,7 +58,7 @@ function DesignTab({ node }: { node: NodeData }) {
 						<span>W</span>
 						<input
 							type="number"
-							value={(style.width as number) ?? ""}
+							value={style.width ?? ""}
 							onChange={(e) => handleStyleChange("width", e.target.value ? Number(e.target.value) : undefined)}
 						/>
 					</label>
@@ -70,7 +66,7 @@ function DesignTab({ node }: { node: NodeData }) {
 						<span>H</span>
 						<input
 							type="number"
-							value={(style.height as number) ?? ""}
+							value={style.height ?? ""}
 							onChange={(e) => handleStyleChange("height", e.target.value ? Number(e.target.value) : undefined)}
 						/>
 					</label>
@@ -81,10 +77,7 @@ function DesignTab({ node }: { node: NodeData }) {
 			<section className="property-section">
 				<h3 className="section-title">Layout</h3>
 				<div className="property-row">
-					<select
-						value={(style.display as string) ?? "block"}
-						onChange={(e) => handleStyleChange("display", e.target.value)}
-					>
+					<select value={style.display ?? "block"} onChange={(e) => handleStyleChange("display", e.target.value)}>
 						<option value="block">Block</option>
 						<option value="flex">Flex</option>
 						<option value="grid">Grid</option>
@@ -98,7 +91,7 @@ function DesignTab({ node }: { node: NodeData }) {
 							<label>
 								<span>Dir</span>
 								<select
-									value={(style.flexDirection as string) ?? "row"}
+									value={style.flexDirection ?? "row"}
 									onChange={(e) => handleStyleChange("flexDirection", e.target.value)}
 								>
 									<option value="row">Row</option>
@@ -111,7 +104,7 @@ function DesignTab({ node }: { node: NodeData }) {
 								<span>Gap</span>
 								<input
 									type="number"
-									value={(style.gap as number) ?? 0}
+									value={style.gap ?? 0}
 									onChange={(e) => handleStyleChange("gap", Number(e.target.value))}
 								/>
 							</label>
@@ -119,10 +112,7 @@ function DesignTab({ node }: { node: NodeData }) {
 						<div className="property-grid" style={{ marginTop: 8 }}>
 							<label>
 								<span>Align</span>
-								<select
-									value={(style.alignItems as string) ?? "stretch"}
-									onChange={(e) => handleStyleChange("alignItems", e.target.value)}
-								>
+								<select value={style.alignItems ?? "stretch"} onChange={(e) => handleStyleChange("alignItems", e.target.value)}>
 									<option value="stretch">Stretch</option>
 									<option value="flex-start">Start</option>
 									<option value="center">Center</option>
@@ -132,7 +122,7 @@ function DesignTab({ node }: { node: NodeData }) {
 							<label>
 								<span>Justify</span>
 								<select
-									value={(style.justifyContent as string) ?? "flex-start"}
+									value={style.justifyContent ?? "flex-start"}
 									onChange={(e) => handleStyleChange("justifyContent", e.target.value)}
 								>
 									<option value="flex-start">Start</option>
@@ -156,7 +146,7 @@ function DesignTab({ node }: { node: NodeData }) {
 						<input
 							type="number"
 							placeholder="Padding"
-							value={(style.padding as number) ?? ""}
+							value={style.padding ?? ""}
 							onChange={(e) => handleStyleChange("padding", e.target.value ? Number(e.target.value) : undefined)}
 						/>
 					</label>
@@ -165,7 +155,7 @@ function DesignTab({ node }: { node: NodeData }) {
 						<input
 							type="number"
 							placeholder="Margin"
-							value={(style.margin as number) ?? ""}
+							value={style.margin ?? ""}
 							onChange={(e) => handleStyleChange("margin", e.target.value ? Number(e.target.value) : undefined)}
 						/>
 					</label>
@@ -178,12 +168,12 @@ function DesignTab({ node }: { node: NodeData }) {
 				<div className="property-row">
 					<input
 						type="color"
-						value={(style.backgroundColor as string) ?? "#ffffff"}
+						value={style.backgroundColor ?? "#ffffff"}
 						onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
 					/>
 					<input
 						type="text"
-						value={(style.backgroundColor as string) ?? ""}
+						value={style.backgroundColor ?? ""}
 						placeholder="#ffffff"
 						onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
 					/>
@@ -198,7 +188,7 @@ function DesignTab({ node }: { node: NodeData }) {
 						<span>Width</span>
 						<input
 							type="number"
-							value={(style.borderWidth as number) ?? ""}
+							value={style.borderWidth ?? ""}
 							onChange={(e) => handleStyleChange("borderWidth", e.target.value ? Number(e.target.value) : undefined)}
 						/>
 					</label>
@@ -206,7 +196,7 @@ function DesignTab({ node }: { node: NodeData }) {
 						<span>Radius</span>
 						<input
 							type="number"
-							value={(style.borderRadius as number) ?? ""}
+							value={style.borderRadius ?? ""}
 							onChange={(e) => handleStyleChange("borderRadius", e.target.value ? Number(e.target.value) : undefined)}
 						/>
 					</label>
@@ -214,13 +204,10 @@ function DesignTab({ node }: { node: NodeData }) {
 				<div className="property-row" style={{ marginTop: 8 }}>
 					<input
 						type="color"
-						value={(style.borderColor as string) ?? "#000000"}
+						value={style.borderColor ?? "#000000"}
 						onChange={(e) => handleStyleChange("borderColor", e.target.value)}
 					/>
-					<select
-						value={(style.borderStyle as string) ?? "solid"}
-						onChange={(e) => handleStyleChange("borderStyle", e.target.value)}
-					>
+					<select value={style.borderStyle ?? "solid"} onChange={(e) => handleStyleChange("borderStyle", e.target.value)}>
 						<option value="none">None</option>
 						<option value="solid">Solid</option>
 						<option value="dashed">Dashed</option>
@@ -237,16 +224,13 @@ function DesignTab({ node }: { node: NodeData }) {
 						<span>Size</span>
 						<input
 							type="number"
-							value={(style.fontSize as number) ?? ""}
+							value={style.fontSize ?? ""}
 							onChange={(e) => handleStyleChange("fontSize", e.target.value ? Number(e.target.value) : undefined)}
 						/>
 					</label>
 					<label>
 						<span>Weight</span>
-						<select
-							value={(style.fontWeight as string) ?? "normal"}
-							onChange={(e) => handleStyleChange("fontWeight", e.target.value)}
-						>
+						<select value={style.fontWeight ?? "normal"} onChange={(e) => handleStyleChange("fontWeight", e.target.value)}>
 							<option value="normal">Normal</option>
 							<option value="500">Medium</option>
 							<option value="600">Semibold</option>
@@ -257,19 +241,19 @@ function DesignTab({ node }: { node: NodeData }) {
 				<div className="property-row" style={{ marginTop: 8 }}>
 					<input
 						type="color"
-						value={(style.color as string) ?? "#000000"}
+						value={style.color ?? "#000000"}
 						onChange={(e) => handleStyleChange("color", e.target.value)}
 					/>
 					<input
 						type="text"
-						value={(style.color as string) ?? ""}
+						value={style.color ?? ""}
 						placeholder="#000000"
 						onChange={(e) => handleStyleChange("color", e.target.value)}
 					/>
 				</div>
 				<div className="property-row" style={{ marginTop: 8 }}>
 					<select
-						value={(style.textAlign as string) ?? "left"}
+						value={style.textAlign ?? "left"}
 						onChange={(e) => handleStyleChange("textAlign", e.target.value)}
 						style={{ flex: 1 }}
 					>

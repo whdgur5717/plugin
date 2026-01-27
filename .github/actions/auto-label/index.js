@@ -1,13 +1,16 @@
-const core = require("@actions/core")
-const github = require("@actions/github")
-const { minimatch } = require("minimatch")
+import { getInput, info, warning, setFailed } from "@actions/core"
+import { getOctokit, context } from "@actions/github"
+import { minimatch } from "minimatch"
+import { createRequire } from "module"
+
+const require = createRequire(import.meta.url)
 const config = require("./label-config.json")
 
 async function run() {
-	const token = core.getInput("github-token", { required: true })
-	const octokit = github.getOctokit(token)
-	const { owner, repo } = github.context.repo
-	const prNumber = github.context.payload.pull_request.number
+	const token = getInput("github-token", { required: true })
+	const octokit = getOctokit(token)
+	const { owner, repo } = context.repo
+	const prNumber = context.payload.pull_request.number
 
 	// Get changed files
 	const { data: files } = await octokit.rest.pulls.listFiles({
@@ -22,11 +25,11 @@ async function run() {
 		.map((labelConfig) => labelConfig.name)
 
 	if (labelsToAdd.length === 0) {
-		core.info("No matching labels found for changed files")
+		info("No matching labels found for changed files")
 		return
 	}
 
-	core.info(`Labels to add: ${labelsToAdd.join(", ")}`)
+	info(`Labels to add: ${labelsToAdd.join(", ")}`)
 
 	// Create labels if they don't exist
 	for (const labelName of labelsToAdd) {
@@ -38,11 +41,11 @@ async function run() {
 				name: labelName,
 				color: labelConfig.color,
 			})
-			core.info(`Created label: ${labelName}`)
+			info(`Created label: ${labelName}`)
 		} catch (error) {
 			// Label already exists, ignore error
 			if (error.status !== 422) {
-				core.warning(`Failed to create label ${labelName}: ${error.message}`)
+				warning(`Failed to create label ${labelName}: ${error.message}`)
 			}
 		}
 	}
@@ -55,7 +58,7 @@ async function run() {
 		labels: labelsToAdd,
 	})
 
-	core.info(`Successfully added labels to PR #${prNumber}`)
+	info(`Successfully added labels to PR #${prNumber}`)
 }
 
-run().catch((error) => core.setFailed(error.message))
+run().catch((error) => setFailed(error.message))

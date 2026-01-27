@@ -1,0 +1,167 @@
+{
+	"master": {
+		"tasks": [
+			{
+				"id": 1,
+				"title": "Undo/Redo 시스템 구현",
+				"description": "모든 편집 작업에 대한 실행 취소/재실행 기능을 구현하여 에디터의 기본 UX를 완성합니다.",
+				"details": "Zustand 미들웨어를 활용하여 히스토리 스택 기반 Undo/Redo를 구현합니다.\n\n**구현 방법:**\n1. `packages/editor-shell/src/store/history.ts` 생성\n2. Zustand의 `temporal` 미들웨어 패턴 적용 또는 커스텀 히스토리 미들웨어 작성\n3. 상태 변경마다 스냅샷 저장 (document, components, selection)\n4. `undo()`, `redo()`, `canUndo()`, `canRedo()` 액션 추가\n5. 키보드 단축키 연결: Cmd/Ctrl+Z (undo), Cmd/Ctrl+Shift+Z (redo)\n\n**기술 선택:**\n- `zustand/middleware` 의 temporal 패턴 참고\n- 또는 직접 구현: `history: { past: EditorState[], future: EditorState[] }`\n- 성능 최적화: 최대 50개 히스토리 유지, 깊은 복사 최소화\n\n**의사 코드:**\n```typescript\ninterface HistoryState {\n  past: EditorState[]\n  future: EditorState[]\n}\n\nconst historyMiddleware = (config) => (set, get, api) => {\n  const setState = (...args) => {\n    const currentState = get()\n    const past = [...currentState.past, currentState].slice(-50)\n    set({ past, future: [] })\n    set(...args)\n  }\n  \n  const undo = () => {\n    const { past, future } = get()\n    if (past.length === 0) return\n    const previous = past[past.length - 1]\n    set({ \n      ...previous,\n      past: past.slice(0, -1),\n      future: [get(), ...future]\n    })\n  }\n  \n  return config(setState, get, api)\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 유닛 테스트: `packages/editor-shell/src/store/__tests__/history.test.ts`\n   - 상태 변경 후 undo 시 이전 상태 복원 확인\n   - redo 시 다음 상태 복원 확인\n   - canUndo/canRedo 플래그 정확성\n2. 통합 테스트:\n   - 노드 추가 → undo → redo 시나리오\n   - 여러 작업 후 연속 undo → redo\n   - 히스토리 최대 크기 제한 동작\n3. E2E 테스트 (Playwright):\n   - 캔버스에서 노드 이동 후 Cmd+Z로 복원\n   - 복잡한 편집 시나리오 (추가/삭제/이동 혼합)",
+				"priority": "high",
+				"dependencies": [],
+				"status": "pending",
+				"subtasks": [
+					{
+						"id": 1,
+						"title": "히스토리 미들웨어 타입 정의 및 기본 구조 설계",
+						"description": "EditorState의 히스토리 추적을 위한 타입 정의와 미들웨어 구조를 설계합니다. Zustand의 미들웨어 패턴을 활용하여 상태 스냅샷을 관리할 수 있는 기반을 마련합니다.",
+						"dependencies": [],
+						"details": "**구현 내용:**\n1. `packages/editor-core/src/types/history.ts` 생성\n   - `HistoryState` 인터페이스 정의: `past: EditorState[]`, `future: EditorState[]`\n   - `HistoryActions` 인터페이스 정의: `undo()`, `redo()`, `canUndo()`, `canRedo()`\n   - 히스토리 설정 인터페이스: `HistoryConfig` (maxHistorySize, equalityFn)\n\n2. `editor.ts`의 `EditorStore` 타입 확장\n   - `EditorStore`에 `HistoryState` & `HistoryActions` 추가\n\n**타입 정의 예시:**\n```typescript\nexport interface HistoryState {\n  past: EditorState[]\n  future: EditorState[]\n}\n\nexport interface HistoryActions {\n  undo: () => void\n  redo: () => void\n  canUndo: () => boolean\n  canRedo: () => boolean\n}\n\nexport interface HistoryConfig {\n  maxHistorySize?: number // 기본값: 50\n  equalityFn?: (a: EditorState, b: EditorState) => boolean\n}\n```\n\n**참고:**\n- 기존 `EditorState` (editor.ts:11-29)는 document, components, selection, hoveredId, activeTool, zoom을 포함\n- `EditorStore`는 `EditorState & EditorActions`로 정의되어 있음 (editor.ts:103)",
+						"status": "pending",
+						"testStrategy": "타입 정의는 TypeScript 컴파일 체크로 검증합니다.\n- `pnpm type-check` 실행 시 에러가 없어야 함\n- `HistoryState`, `HistoryActions`, `HistoryConfig`가 올바르게 export되는지 확인\n- 순환 참조나 타입 충돌이 없는지 확인"
+					},
+					{
+						"id": 2,
+						"title": "히스토리 미들웨어 구현",
+						"description": "Zustand 스토어를 래핑하여 상태 변경을 자동으로 추적하고 히스토리 스택에 저장하는 미들웨어를 구현합니다. 성능 최적화를 위해 최대 50개의 히스토리만 유지합니다.",
+						"dependencies": [1],
+						"details": "**구현 내용:**\n1. `packages/editor-shell/src/store/middleware/history.ts` 생성\n2. `historyMiddleware` 함수 작성\n   - Zustand의 `StateCreator` 타입을 활용한 미들웨어 패턴\n   - 상태 변경 감지 시 이전 상태를 past 배열에 추가\n   - 최대 50개 히스토리 유지 (FIFO)\n   - 새로운 변경 발생 시 future 배열 초기화\n\n**핵심 로직:**\n```typescript\nimport type { StateCreator, StoreMutatorIdentifier } from 'zustand'\nimport type { EditorState, HistoryState, HistoryActions } from '@design-editor/core'\n\ntype HistoryMiddleware = <\n  T extends EditorState,\n  Mps extends [StoreMutatorIdentifier, unknown][] = [],\n  Mcs extends [StoreMutatorIdentifier, unknown][] = []\n>(\n  config: StateCreator<T, Mps, Mcs>\n) => StateCreator<T & HistoryState, Mps, Mcs>\n\nexport const historyMiddleware: HistoryMiddleware = (config) => (set, get, api) => {\n  const MAX_HISTORY = 50\n  \n  return {\n    ...config(\n      (args) => {\n        const currentState = get() as EditorState\n        const snapshot = {\n          document: currentState.document,\n          components: currentState.components,\n          selection: currentState.selection,\n          hoveredId: currentState.hoveredId,\n          activeTool: currentState.activeTool,\n          zoom: currentState.zoom,\n        }\n        \n        set((state: any) => ({\n          past: [...state.past, snapshot].slice(-MAX_HISTORY),\n          future: [],\n        }))\n        \n        set(args)\n      },\n      get,\n      api\n    ),\n    past: [],\n    future: [],\n  }\n}\n```\n\n**주의사항:**\n- hoveredId 변경은 히스토리에 포함하지 않도록 필터링 필요\n- 깊은 복사 대신 구조적 공유로 메모리 최적화",
+						"status": "pending",
+						"testStrategy": "**유닛 테스트:** `packages/editor-shell/src/store/middleware/__tests__/history.test.ts`\n1. 상태 변경 시 past 배열에 스냅샷 추가 확인\n2. 새로운 변경 시 future 배열 초기화 확인\n3. 최대 50개 히스토리 제한 동작 확인 (51번째 변경 시 가장 오래된 항목 제거)\n4. hoveredId 변경은 히스토리에 추가되지 않음 확인"
+					},
+					{
+						"id": 3,
+						"title": "Undo/Redo 액션 구현",
+						"description": "히스토리 스택을 사용하여 이전 상태로 되돌리거나 다시 실행하는 undo/redo 액션을 구현합니다. canUndo/canRedo 헬퍼 함수도 함께 제공합니다.",
+						"dependencies": [2],
+						"details": "**구현 내용:**\n1. `editor.ts`의 스토어에 히스토리 액션 추가\n2. `undo()` 구현:\n   - past 배열에서 마지막 상태를 pop\n   - 현재 상태를 future 배열에 push\n   - past의 마지막 상태로 복원\n3. `redo()` 구현:\n   - future 배열에서 첫 번째 상태를 shift\n   - 현재 상태를 past 배열에 push\n   - future의 첫 번째 상태로 복원\n4. `canUndo()`, `canRedo()` 헬퍼 함수\n\n**액션 코드 예시:**\n```typescript\n// editor.ts의 create 함수 내부에 추가\nundo() {\n  const state = get()\n  if (state.past.length === 0) return\n  \n  const previous = state.past[state.past.length - 1]\n  const currentSnapshot = {\n    document: state.document,\n    components: state.components,\n    selection: state.selection,\n    hoveredId: state.hoveredId,\n    activeTool: state.activeTool,\n    zoom: state.zoom,\n  }\n  \n  set({\n    ...previous,\n    past: state.past.slice(0, -1),\n    future: [currentSnapshot, ...state.future],\n  })\n},\n\nredo() {\n  const state = get()\n  if (state.future.length === 0) return\n  \n  const next = state.future[0]\n  const currentSnapshot = {\n    document: state.document,\n    components: state.components,\n    selection: state.selection,\n    hoveredId: state.hoveredId,\n    activeTool: state.activeTool,\n    zoom: state.zoom,\n  }\n  \n  set({\n    ...next,\n    past: [...state.past, currentSnapshot],\n    future: state.future.slice(1),\n  })\n},\n\ncanUndo: () => get().past.length > 0,\ncanRedo: () => get().future.length > 0,\n```\n\n**주의사항:**\n- 상태 복원 시 Canvas와의 동기화는 기존 subscribe 메커니즘이 자동 처리 (App.tsx:60-67)",
+						"status": "pending",
+						"testStrategy": "**유닛 테스트:** `packages/editor-shell/src/store/__tests__/undo-redo.test.ts`\n1. 노드 추가 → undo → 노드가 제거되고 이전 상태로 복원됨\n2. 노드 스타일 변경 → undo → 이전 스타일로 복원됨\n3. undo 후 redo → 다시 변경된 상태로 복원됨\n4. 여러 작업 후 연속 undo → 각 단계별로 정확히 복원됨\n5. canUndo()가 past.length > 0일 때만 true 반환\n6. canRedo()가 future.length > 0일 때만 true 반환\n7. undo 불가능한 상태에서 undo 호출 → 아무 일도 발생하지 않음"
+					},
+					{
+						"id": 4,
+						"title": "키보드 단축키 연결 (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z)",
+						"description": "기존 키보드 단축키 훅에 Undo/Redo 단축키를 추가합니다. Cmd+Z로 실행 취소, Cmd+Shift+Z로 재실행이 가능하도록 구현합니다.",
+						"dependencies": [3],
+						"details": "**구현 내용:**\n1. `packages/editor-shell/src/hooks/useKeyboardShortcuts.ts` 수정\n2. 기존 단축키 핸들러에 undo/redo 로직 추가\n3. Cmd/Ctrl+Z: `undo()` 호출\n4. Cmd/Ctrl+Shift+Z: `redo()` 호출\n5. Windows/Linux에서는 Ctrl+Z, Ctrl+Y도 지원 고려\n\n**코드 수정 예시:**\n```typescript\n// useKeyboardShortcuts.ts 내부\nconst undo = useEditorStore((state) => state.undo)\nconst redo = useEditorStore((state) => state.redo)\nconst canUndo = useEditorStore((state) => state.canUndo)\nconst canRedo = useEditorStore((state) => state.canRedo)\n\nuseEffect(() => {\n  const handleKeyDown = (e: KeyboardEvent) => {\n    // ... 기존 코드 ...\n    \n    const isMeta = e.metaKey || e.ctrlKey\n    \n    // Cmd/Ctrl+Z: Undo\n    if (isMeta && e.key === 'z' && !e.shiftKey) {\n      e.preventDefault()\n      if (canUndo()) {\n        undo()\n      }\n    }\n    \n    // Cmd/Ctrl+Shift+Z: Redo (Mac)\n    // Cmd/Ctrl+Y: Redo (Windows/Linux)\n    if ((isMeta && e.key === 'z' && e.shiftKey) || (isMeta && e.key === 'y')) {\n      e.preventDefault()\n      if (canRedo()) {\n        redo()\n      }\n    }\n  }\n  \n  // ... 기존 코드 ...\n}, [document, selection, setSelection, removeNode, duplicateNode, undo, redo, canUndo, canRedo])\n```\n\n**참고:**\n- 기존 단축키 구현 패턴 유지 (useKeyboardShortcuts.ts:26-75)\n- input/textarea에서는 단축키 무시 (useKeyboardShortcuts.ts:36-39)",
+						"status": "pending",
+						"testStrategy": "**통합 테스트:**\n1. 수동 테스트로 키보드 동작 확인\n   - 노드 추가 후 Cmd+Z → 노드 제거 확인\n   - Cmd+Shift+Z → 노드 다시 추가 확인\n   - input 필드 포커스 시 Cmd+Z가 에디터에 영향 주지 않음 확인\n\n**E2E 테스트:** `playwright/**/*.test.ts`\n1. Canvas에서 노드 추가 → Cmd+Z 입력 → 노드가 사라짐\n2. Cmd+Shift+Z 입력 → 노드가 다시 나타남\n3. 여러 작업 후 연속 Cmd+Z → 각 작업이 역순으로 취소됨"
+					},
+					{
+						"id": 5,
+						"title": "히스토리 미들웨어 통합 및 최적화",
+						"description": "구현한 히스토리 미들웨어를 실제 에디터 스토어에 적용하고, hoveredId와 같은 일시적 상태 변경을 히스토리에서 제외하는 최적화를 수행합니다.",
+						"dependencies": [4],
+						"details": "**구현 내용:**\n1. `editor.ts`의 `create` 함수에 히스토리 미들웨어 적용\n2. hoveredId 변경은 히스토리 추적에서 제외\n3. 성능 최적화:\n   - 동일한 상태 연속 변경 시 중복 스냅샷 방지\n   - debounce 패턴 적용 고려 (드래그 중 연속 moveNode 호출)\n4. 통합 테스트 및 버그 수정\n\n**미들웨어 적용 예시:**\n```typescript\n// editor.ts\nimport { create } from 'zustand'\nimport { historyMiddleware } from './middleware/history'\n\nexport const useEditorStore = create<EditorStore>()((\n  historyMiddleware(\n    (set, get) => ({\n      // 기존 초기 상태\n      document: initialDocument,\n      components: [],\n      selection: [],\n      hoveredId: null,\n      activeTool: 'select',\n      zoom: 1,\n      \n      // 기존 액션들...\n      updateNode(id: string, updates: Partial<NodeData>) {\n        set((state) => ({\n          document: updateNodeInTree(state.document, id, updates) as DocumentNode,\n        }))\n      },\n      \n      // ... 나머지 액션들 ...\n    })\n  )\n))\n```\n\n**히스토리 제외 로직:**\n```typescript\n// hoveredId 변경 시 히스토리에 추가하지 않도록 수정\nsetHoveredId(id: string | null) {\n  // 히스토리 미들웨어를 우회하는 플래그 또는 별도 처리\n  set({ hoveredId: id }, false, 'setHoveredId/noHistory')\n},\n```\n\n**드래그 최적화 (선택적):**\n- moveNode 호출 시 debounce 적용하여 드래그 완료 시점에만 히스토리 저장\n- 또는 `onNodeMoved` 완료 시점에 히스토리 기록\n\n**검증 항목:**\n- 모든 기존 기능이 정상 동작하는지 확인\n- Canvas 동기화가 undo/redo 후에도 올바르게 작동하는지 확인\n- 메모리 누수 없는지 확인 (개발자 도구 프로파일링)",
+						"status": "pending",
+						"testStrategy": "**통합 테스트:**\n1. 전체 에디터 워크플로우 테스트\n   - 노드 추가/삭제/이동/리사이즈 → undo/redo → 모든 작업이 올바르게 복원됨\n   - 컴포넌트 생성/인스턴스 추가 → undo/redo → 컴포넌트 상태 복원 확인\n2. 성능 테스트\n   - 50개 이상 작업 수행 → 히스토리 크기가 50개로 제한됨\n   - 빠른 연속 드래그 → 히스토리가 과도하게 쌓이지 않음\n3. 엣지 케이스\n   - Canvas iframe 재연결 후 undo/redo 동작 확인\n   - hoveredId 변경 후 undo → hoveredId는 복원되지 않고 document만 복원됨\n\n**E2E 테스트:**\n- 실제 사용 시나리오 (노드 생성 → 스타일 변경 → 이동 → undo 3회 → redo 2회)\n- 브라우저 새로고침 후에도 정상 동작 (히스토리는 초기화됨)"
+					}
+				]
+			},
+			{
+				"id": 2,
+				"title": "컴포넌트/인스턴스 codegen 지원",
+				"description": "현재 serialize.ts가 일반 노드만 처리하므로, ComponentDefinition과 InstanceNode를 JSX로 변환하는 로직을 추가합니다.",
+				"details": "**현재 상태:**\n- `serialize.ts`는 NodeData만 처리\n- InstanceNode (`type: '__INSTANCE__'`)와 ComponentDefinition 미지원\n\n**구현 방법:**\n1. `packages/editor-core/src/codegen/serialize.ts` 수정\n2. `serializeNodeInternal`에서 `type === '__INSTANCE__'` 분기 추가\n3. InstanceNode 처리:\n   - componentId로 ComponentDefinition 조회\n   - root 노드를 재귀 렌더링\n   - overrides 적용 (해당 nodeId의 props/style/children 덮어쓰기)\n4. ComponentDefinition 전체 export:\n   - `serializeComponent(component: ComponentDefinition)` 함수 추가\n   - 컴포넌트 이름으로 함수 생성\n\n**의사 코드:**\n```typescript\nfunction serializeNodeInternal(node: NodeData, options, depth, components: ComponentDefinition[]) {\n  if (node.type === '__INSTANCE__') {\n    const instance = node as InstanceNode\n    const component = components.find(c => c.id === instance.componentId)\n    if (!component) return '/* Component not found */'\n    \n    // root를 복제하고 overrides 적용\n    const resolvedRoot = applyOverrides(component.root, instance.overrides)\n    return serializeNodeInternal(resolvedRoot, options, depth, components)\n  }\n  \n  // 기존 로직...\n}\n\nfunction applyOverrides(node: NodeData, overrides?: Record<string, any>): NodeData {\n  if (!overrides || !overrides[node.id]) return node\n  const override = overrides[node.id]\n  return {\n    ...node,\n    props: { ...node.props, ...override.props },\n    style: { ...node.style, ...override.style },\n    children: override.children ?? node.children\n  }\n}\n\nfunction serializeComponent(component: ComponentDefinition, options): string {\n  const jsx = serializeNode(component.root, options)\n  return `export function ${component.name}() {\\n  return (\\n${jsx}\\n  );\\n}`\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 유닛 테스트: `packages/editor-core/src/codegen/__tests__/serialize-component.test.ts`\n   - 단순 컴포넌트 정의 → JSX 변환\n   - 인스턴스 → 컴포넌트 root 렌더링\n   - 오버라이드 적용 (props, style, children)\n2. 스냅샷 테스트:\n   - 복잡한 컴포넌트/인스턴스 트리 → 예상 JSX 코드 비교\n3. 통합 테스트:\n   - 에디터에서 컴포넌트 생성 → 인스턴스 추가 → 코드 프리뷰에서 올바른 JSX 확인",
+				"priority": "high",
+				"dependencies": [1],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 3,
+				"title": "실시간 코드 프리뷰 패널 구현",
+				"description": "선택한 노드의 JSX 코드를 우측 패널에 실시간으로 표시하고 복사 기능을 제공합니다.",
+				"details": "**UI 위치:** 우측 패널에 탭 형태로 추가 (Properties / Code)\n\n**구현 방법:**\n1. `packages/editor-shell/src/components/CodePreviewPanel.tsx` 생성\n2. 선택된 노드 ID를 감시하여 실시간 코드 생성\n   - `const selectedNode = useEditorStore(state => findNode(state.document, state.selection[0]))`\n   - `const code = serializeNode(selectedNode, { indent: '  ' })`\n3. Syntax highlighting: `react-syntax-highlighter` 또는 `prism-react-renderer` 사용\n4. 복사 버튼: `navigator.clipboard.writeText(code)`\n5. 다중 선택 시 처리:\n   - 단일 선택: 해당 노드만\n   - 다중 선택: 공통 부모로 감싸서 표시\n   - 선택 없음: 전체 document\n\n**의사 코드:**\n```tsx\nimport { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'\nimport { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'\n\nexport function CodePreviewPanel() {\n  const selection = useEditorStore(state => state.selection)\n  const document = useEditorStore(state => state.document)\n  const components = useEditorStore(state => state.components)\n  \n  const code = useMemo(() => {\n    if (selection.length === 0) {\n      return serializeDocument(document, 'Component')\n    }\n    if (selection.length === 1) {\n      const node = findNode(document, selection[0])\n      return node ? serializeNode(node, { components }) : ''\n    }\n    // 다중 선택: Fragment로 감싸기\n    const nodes = selection.map(id => findNode(document, id)).filter(Boolean)\n    return `<>\\n${nodes.map(n => serializeNode(n)).join('\\n')}\\n</>`\n  }, [selection, document, components])\n  \n  const handleCopy = () => {\n    navigator.clipboard.writeText(code)\n    toast.success('Copied to clipboard')\n  }\n  \n  return (\n    <div className=\"code-preview\">\n      <div className=\"toolbar\">\n        <button onClick={handleCopy}>Copy</button>\n      </div>\n      <SyntaxHighlighter language=\"tsx\" style={vscDarkPlus}>\n        {code}\n      </SyntaxHighlighter>\n    </div>\n  )\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 컴포넌트 테스트:\n   - 노드 선택 시 올바른 JSX 표시\n   - 복사 버튼 클릭 시 클립보드에 코드 복사\n2. E2E 테스트:\n   - 캔버스에서 노드 선택 → 코드 패널에 즉시 반영\n   - 스타일 변경 → 코드 실시간 업데이트\n   - 다중 선택 → Fragment 래핑 확인",
+				"priority": "medium",
+				"dependencies": [2],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 4,
+				"title": "Variant 데이터 모델 및 타입 정의",
+				"description": "ComponentDefinition에 Variant 정보를 저장할 수 있도록 타입과 데이터 구조를 확장합니다.",
+				"details": "**Variant 시스템 설계:**\n- Variant Property: 하나의 속성 (예: size, state)\n- Variant Option: 각 속성의 가능한 값 (예: sm/md/lg, default/hover/disabled)\n- Variant Combination: 속성 조합에 대한 스타일 오버라이드\n\n**구현 방법:**\n1. `packages/editor-core/src/types/variant.ts` 생성\n2. ComponentDefinition 인터페이스 확장\n3. InstanceNode에 선택된 variant 정보 추가\n\n**타입 정의:**\n```typescript\n// variant.ts\nexport interface VariantProperty {\n  name: string // 'size', 'state'\n  options: string[] // ['sm', 'md', 'lg']\n  defaultValue: string // 'md'\n}\n\nexport interface VariantOverride {\n  // 조합 조건: { size: 'lg', state: 'hover' }\n  condition: Record<string, string>\n  // 해당 조건일 때 적용할 노드별 오버라이드\n  overrides: {\n    [nodeId: string]: {\n      props?: Record<string, unknown>\n      style?: CSSProperties\n    }\n  }\n}\n\nexport interface VariantConfig {\n  properties: VariantProperty[]\n  overrides: VariantOverride[]\n}\n\n// node.ts에서 ComponentDefinition 확장\nexport interface ComponentDefinition {\n  id: string\n  name: string\n  root: NodeData\n  createdAt: string\n  variants?: VariantConfig // 추가\n}\n\n// InstanceNode 확장\nexport interface InstanceNode extends Omit<NodeData, 'type' | 'children'> {\n  type: '__INSTANCE__'\n  componentId: string\n  overrides?: {...}\n  variantSelection?: Record<string, string> // { size: 'lg', state: 'hover' }\n}\n```\n\n**스토어 액션 추가:**\n```typescript\n// editor.ts\ninterface EditorActions {\n  // ...\n  setComponentVariants: (componentId: string, variants: VariantConfig) => void\n  setInstanceVariant: (instanceId: string, property: string, value: string) => void\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 타입 체크: TypeScript 컴파일 에러 없이 빌드\n2. 유닛 테스트:\n   - VariantConfig 생성 및 직렬화\n   - Variant 조합 매칭 로직 (`matchVariant(condition, selection)`)\n3. 통합 테스트:\n   - 컴포넌트에 variant 설정 → 저장 → 로드 확인",
+				"priority": "high",
+				"dependencies": [2],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 5,
+				"title": "Variant 편집 UI 구현",
+				"description": "컴포넌트 에디터에서 Variant property와 option을 추가/편집하고, 각 조합에 대한 스타일을 설정하는 UI를 제공합니다.",
+				"details": "**UI 구성:**\n1. 컴포넌트 편집 모드 진입 (더블클릭 또는 Edit Component 버튼)\n2. 좌측 패널에 \"Variants\" 섹션 추가\n3. Variant Property 추가/삭제\n4. 각 Property의 Option 추가/삭제\n5. Variant 조합 선택 → 캔버스에서 해당 조합 프리뷰 → 스타일 편집 → 오버라이드 저장\n\n**구현 방법:**\n1. `packages/editor-shell/src/components/VariantEditor.tsx` 생성\n2. Property 관리:\n   - Input으로 property 이름 입력\n   - Chip 형태로 option 추가 (Enter키로 추가)\n3. Combination 편집:\n   - 모든 property 드롭다운으로 조합 선택\n   - 선택된 조합의 프리뷰 렌더링\n   - 속성 패널에서 스타일 변경 시 해당 조합의 override에 저장\n\n**의사 코드:**\n```tsx\nfunction VariantEditor({ componentId }: { componentId: string }) {\n  const component = useEditorStore(state => \n    state.components.find(c => c.id === componentId)\n  )\n  const setVariants = useEditorStore(state => state.setComponentVariants)\n  \n  const [properties, setProperties] = useState<VariantProperty[]>(\n    component?.variants?.properties ?? []\n  )\n  \n  const addProperty = (name: string, options: string[]) => {\n    const newProp: VariantProperty = { name, options, defaultValue: options[0] }\n    setProperties([...properties, newProp])\n  }\n  \n  const handleSave = () => {\n    setVariants(componentId, { properties, overrides: [] })\n  }\n  \n  return (\n    <div className=\"variant-editor\">\n      <h3>Variant Properties</h3>\n      {properties.map(prop => (\n        <PropertyRow key={prop.name} property={prop} onChange={updateProperty} />\n      ))}\n      <button onClick={() => setShowAddDialog(true)}>Add Property</button>\n      \n      <h3>Variant Combinations</h3>\n      <VariantCombinationSelector \n        properties={properties}\n        onSelect={(combination) => setActiveCombination(combination)}\n      />\n      \n      <button onClick={handleSave}>Save Variants</button>\n    </div>\n  )\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 컴포넌트 테스트:\n   - Property 추가/삭제\n   - Option 추가/삭제\n   - Default value 설정\n2. E2E 테스트:\n   - Button 컴포넌트 생성 → Variant 추가 (size: sm/md/lg) → 각 조합 프리뷰\n   - 조합 선택 → 스타일 변경 → 저장 → 인스턴스에서 확인",
+				"priority": "medium",
+				"dependencies": [4],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 6,
+				"title": "인스턴스 Variant 선택 UI 및 렌더링",
+				"description": "컴포넌트 인스턴스에서 Variant 조합을 선택할 수 있는 UI를 제공하고, 선택된 variant에 따라 스타일이 적용되도록 구현합니다.",
+				"details": "**UI 위치:** 인스턴스 선택 시 속성 패널 상단에 Variant 선택기 표시\n\n**구현 방법:**\n1. `packages/editor-shell/src/components/InstanceVariantSelector.tsx` 생성\n2. 인스턴스의 componentId로 ComponentDefinition 조회\n3. Variant properties를 드롭다운/버튼 그룹으로 표시\n4. 선택 변경 시 `setInstanceVariant(instanceId, property, value)` 호출\n5. 캔버스 렌더링 시 variant에 맞는 오버라이드 적용\n\n**렌더링 로직:**\n```typescript\n// canvas/src/components/InstanceRenderer.tsx\nfunction InstanceRenderer({ instance }: { instance: InstanceNode }) {\n  const component = useComponent(instance.componentId)\n  if (!component) return null\n  \n  // 1. variantSelection에 맞는 override 찾기\n  const variantOverrides = resolveVariantOverrides(\n    component.variants,\n    instance.variantSelection\n  )\n  \n  // 2. component.root에 variant override 적용\n  const rootWithVariants = applyOverridesToTree(component.root, variantOverrides)\n  \n  // 3. 인스턴스 레벨 overrides 추가 적용\n  const finalRoot = applyOverridesToTree(rootWithVariants, instance.overrides)\n  \n  return <NodeRenderer node={finalRoot} />\n}\n\nfunction resolveVariantOverrides(\n  variants: VariantConfig | undefined,\n  selection: Record<string, string> | undefined\n): Record<string, { props?: any; style?: any }> {\n  if (!variants || !selection) return {}\n  \n  // 모든 override 중 selection과 일치하는 것 찾기\n  const matchingOverrides = variants.overrides.filter(override => {\n    return Object.entries(override.condition).every(\n      ([key, value]) => selection[key] === value\n    )\n  })\n  \n  // 여러 매칭이 있으면 병합 (나중 것이 우선)\n  return matchingOverrides.reduce(\n    (acc, override) => mergeOverrides(acc, override.overrides),\n    {}\n  )\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 유닛 테스트:\n   - `resolveVariantOverrides` 함수: 다양한 조합 테스트\n   - 부분 매칭, 완전 매칭, 우선순위 테스트\n2. 통합 테스트:\n   - Button 인스턴스 생성 → size 변경 → 캔버스에서 스타일 즉시 반영\n3. E2E 테스트:\n   - 인스턴스 선택 → Variant 드롭다운 변경 → 실시간 프리뷰",
+				"priority": "medium",
+				"dependencies": [5],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 7,
+				"title": "Variant codegen 구현",
+				"description": "Variant가 있는 컴포넌트를 props 기반 React 컴포넌트로 export하며, 인스턴스는 해당 props를 전달하는 JSX로 변환합니다.",
+				"details": "**출력 형태:**\n```tsx\n// 컴포넌트 정의\nexport function Button({ size = 'md', state = 'default' }) {\n  const sizeStyles = {\n    sm: { fontSize: 12, padding: '4px 8px' },\n    md: { fontSize: 14, padding: '8px 16px' },\n    lg: { fontSize: 16, padding: '12px 24px' }\n  }\n  \n  const stateStyles = {\n    default: { backgroundColor: 'blue' },\n    hover: { backgroundColor: 'darkblue' },\n    disabled: { backgroundColor: 'gray', cursor: 'not-allowed' }\n  }\n  \n  return (\n    <button style={{ ...sizeStyles[size], ...stateStyles[state] }}>\n      Click me\n    </button>\n  )\n}\n\n// 인스턴스 사용\n<Button size=\"lg\" state=\"hover\" />\n```\n\n**구현 방법:**\n1. `packages/editor-core/src/codegen/serialize-variant.ts` 생성\n2. ComponentDefinition을 분석하여:\n   - Variant properties → 함수 파라미터\n   - Variant overrides → 조건부 스타일 객체\n3. 인스턴스 serialize 시:\n   - variantSelection → props로 변환\n\n**의사 코드:**\n```typescript\nfunction serializeComponentWithVariants(component: ComponentDefinition): string {\n  const { variants } = component\n  if (!variants || variants.properties.length === 0) {\n    // 일반 컴포넌트\n    return serializeComponent(component)\n  }\n  \n  // 1. 함수 시그니처 생성\n  const params = variants.properties\n    .map(p => `${p.name} = '${p.defaultValue}'`)\n    .join(', ')\n  \n  // 2. 각 property별 스타일 맵 생성\n  const styleMaps = variants.properties.map(prop => {\n    const map = {}\n    prop.options.forEach(option => {\n      // 해당 option일 때의 override 추출\n      const override = findOverrideForCondition(variants.overrides, { [prop.name]: option })\n      map[option] = override?.style ?? {}\n    })\n    return `const ${prop.name}Styles = ${JSON.stringify(map, null, 2)}`\n  })\n  \n  // 3. JSX에 조건부 스타일 적용\n  const jsx = serializeNodeWithVariantStyles(component.root, variants)\n  \n  return `\nexport function ${component.name}({ ${params} }) {\n  ${styleMaps.join('\\n  ')}\n  \n  return (\n    ${jsx}\n  )\n}\n  `\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 스냅샷 테스트:\n   - 다양한 variant 조합의 컴포넌트 → 생성된 코드가 예상과 일치\n2. 런타임 테스트:\n   - 생성된 코드를 실제로 실행하여 동작 확인\n   - props 변경 시 스타일 변경 확인\n3. 엣지 케이스:\n   - Variant 없는 컴포넌트\n   - 단일 property만 있는 경우\n   - 중첩 조합 (size + state)",
+				"priority": "medium",
+				"dependencies": [6],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 8,
+				"title": "Slot 패턴 데이터 모델 및 UI 구현",
+				"description": "컴포넌트 내부에 교체 가능한 슬롯을 정의하고, 인스턴스에서 슬롯별 콘텐츠를 삽입할 수 있도록 구현합니다.",
+				"details": "**Slot 시스템 설계:**\n- 컴포넌트 정의 시 특정 노드를 \"슬롯\"으로 마킹\n- 인스턴스에서 해당 슬롯에 다른 노드 트리 삽입\n- 필수/선택 슬롯 구분\n\n**타입 정의:**\n```typescript\n// variant.ts에 추가\nexport interface SlotDefinition {\n  id: string // 슬롯 고유 ID\n  name: string // 'header', 'body', 'footer'\n  nodeId: string // component.root 내에서 슬롯 역할을 하는 노드 ID\n  required: boolean\n  defaultContent?: NodeData // 기본 콘텐츠\n}\n\nexport interface ComponentDefinition {\n  // ...\n  slots?: SlotDefinition[]\n}\n\nexport interface InstanceNode {\n  // ...\n  slotContents?: {\n    [slotId: string]: NodeData[] // 해당 슬롯에 삽입할 노드들\n  }\n}\n```\n\n**UI 구현:**\n1. `packages/editor-shell/src/components/SlotEditor.tsx`\n2. 컴포넌트 편집 모드에서:\n   - 노드 우클릭 → \"Mark as Slot\" 메뉴\n   - 슬롯 이름, 필수 여부 입력\n3. 인스턴스 편집 모드에서:\n   - 슬롯 목록 표시\n   - 각 슬롯 클릭 → 하위 노드 편집 가능\n   - 드래그앤드롭으로 노드 삽입\n\n**렌더링 로직:**\n```typescript\nfunction renderNodeWithSlots(\n  node: NodeData,\n  slots: SlotDefinition[],\n  slotContents: Record<string, NodeData[]>\n): ReactNode {\n  const slot = slots.find(s => s.nodeId === node.id)\n  \n  if (slot) {\n    // 이 노드는 슬롯이므로 slotContents로 교체\n    const content = slotContents[slot.id] ?? slot.defaultContent ?? []\n    return content.map(child => renderNode(child))\n  }\n  \n  // 일반 노드\n  return renderNode(node)\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 유닛 테스트:\n   - 슬롯 정의 추가/삭제\n   - 슬롯 콘텐츠 교체 로직\n2. 통합 테스트:\n   - Card 컴포넌트 생성 → header/body/footer 슬롯 정의\n   - 인스턴스에서 각 슬롯에 다른 콘텐츠 삽입\n3. E2E 테스트:\n   - 슬롯 마킹 → 인스턴스 생성 → 슬롯 편집 UI 확인",
+				"priority": "medium",
+				"dependencies": [7],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 9,
+				"title": "Slot codegen 구현",
+				"description": "Slot이 있는 컴포넌트를 children props 또는 named props로 export하며, 인스턴스는 해당 슬롯에 JSX를 전달하는 코드로 변환합니다.",
+				"details": "**출력 형태 (Named Props 방식):**\n```tsx\n// 컴포넌트 정의\nexport function Card({ header, body, footer }) {\n  return (\n    <div className=\"card\">\n      <div className=\"card-header\">{header}</div>\n      <div className=\"card-body\">{body}</div>\n      <div className=\"card-footer\">{footer}</div>\n    </div>\n  )\n}\n\n// 인스턴스 사용\n<Card\n  header={<h2>Title</h2>}\n  body={<p>Content here</p>}\n  footer={<button>Action</button>}\n/>\n```\n\n**출력 형태 (Children 방식 - Compound 패턴 사전 단계):**\n```tsx\nexport function Card({ children }) {\n  return <div className=\"card\">{children}</div>\n}\n\n<Card>\n  <Card.Header><h2>Title</h2></Card.Header>\n  <Card.Body><p>Content</p></Card.Body>\n</Card>\n```\n\n**구현 방법:**\n1. `packages/editor-core/src/codegen/serialize-slot.ts` 생성\n2. 슬롯을 props로 변환:\n   - 각 SlotDefinition → 함수 파라미터\n   - 슬롯 노드 위치에 `{slotName}` 삽입\n3. 인스턴스 serialize 시:\n   - slotContents → JSX props\n\n**의사 코드:**\n```typescript\nfunction serializeComponentWithSlots(component: ComponentDefinition): string {\n  const { slots } = component\n  if (!slots || slots.length === 0) {\n    return serializeComponent(component)\n  }\n  \n  // 1. 파라미터 생성\n  const params = slots.map(s => s.name).join(', ')\n  \n  // 2. JSX에서 슬롯 위치에 {slotName} 삽입\n  const jsx = serializeNodeWithSlots(component.root, slots)\n  \n  return `\nexport function ${component.name}({ ${params} }) {\n  return (\n    ${jsx}\n  )\n}\n  `\n}\n\nfunction serializeNodeWithSlots(node: NodeData, slots: SlotDefinition[]): string {\n  const slot = slots.find(s => s.nodeId === node.id)\n  if (slot) {\n    return `{${slot.name}}`\n  }\n  // 일반 serialize\n  return serializeNode(node)\n}\n\nfunction serializeInstanceWithSlots(instance: InstanceNode, component: ComponentDefinition): string {\n  const { slots = [] } = component\n  const { slotContents = {} } = instance\n  \n  const slotProps = slots.map(slot => {\n    const content = slotContents[slot.id] ?? []\n    const jsx = content.map(serializeNode).join('\\n')\n    return `${slot.name}={${jsx ? `<>${jsx}</>` : 'null'}}`\n  }).join('\\n  ')\n  \n  return `<${component.name}\\n  ${slotProps}\\n/>`\n}\n```",
+				"testStrategy": "**테스트 전략:**\n1. 스냅샷 테스트:\n   - Card 컴포넌트 (3개 슬롯) → 생성 코드 확인\n   - 인스턴스 → props 전달 코드 확인\n2. 런타임 테스트:\n   - 생성된 컴포넌트 실행 → 슬롯 내용 올바르게 렌더링\n3. 엣지 케이스:\n   - 빈 슬롯 (defaultContent 사용)\n   - 필수 슬롯 누락 (에러 또는 경고)",
+				"priority": "medium",
+				"dependencies": [8],
+				"status": "pending",
+				"subtasks": []
+			},
+			{
+				"id": 10,
+				"title": "Export 고도화: Tailwind 및 CSS Module 지원",
+				"description": "코드 export 시 Inline Style 외에 Tailwind CSS 클래스 또는 CSS Module로 변환하는 옵션을 제공합니다.",
+				"details": "**지원 포맷:**\n1. Inline Style (기본, 이미 구현됨)\n2. Tailwind CSS 클래스\n3. CSS Module (.module.css 파일 생성)\n\n**구현 방법:**\n1. `packages/editor-core/src/codegen/style-converter.ts` 생성\n2. CSSProperties → Tailwind 클래스 매핑\n   - 라이브러리 사용: `css-to-tailwind` 또는 직접 매핑 테이블 작성\n   - 예: `{ fontSize: 14, fontWeight: 'bold' }` → `\"text-sm font-bold\"`\n3. CSSProperties → CSS Module\n   - 각 컴포넌트마다 `.module.css` 생성\n   - 고유 클래스명 생성: `${componentName}-${nodeId}`\n\n**Tailwind 변환 의사 코드:**\n```typescript\nfunction convertStyleToTailwind(style: CSSProperties): string {\n  const classes: string[] = []\n  \n  // 간단한 매핑 예시\n  if (style.display === 'flex') classes.push('flex')\n  if (style.flexDirection === 'column') classes.push('flex-col')\n  if (style.fontSize === 14) classes.push('text-sm')\n  if (style.fontWeight === 'bold') classes.push('font-bold')\n  // ... 더 많은 매핑\n  \n  return classes.join(' ')\n}\n\nfunction serializeNodeWithTailwind(node: NodeData): string {\n  const { type, style, children } = node\n  const className = style ? convertStyleToTailwind(style) : ''\n  \n  return `<${type} className=\"${className}\">${children}</${type}>`\n}\n```\n\n**CSS Module 변환 의사 코드:**\n```typescript\nfunction serializeToCSS Module(component: ComponentDefinition): { jsx: string; css: string } {\n  const cssRules: string[] = []\n  \n  function traverse(node: NodeData) {\n    if (node.style) {\n      const className = `${component.name}-${node.id}`\n      const cssRule = `.${className} {\\n${convertStyleToCSS(node.style)}\\n}`\n      cssRules.push(cssRule)\n      \n      // JSX에서 className 사용\n      return { ...node, props: { ...node.props, className } }\n    }\n    return node\n  }\n  \n  const transformedRoot = traverseAndTransform(component.root, traverse)\n  const jsx = serializeNode(transformedRoot)\n  const css = cssRules.join('\\n\\n')\n  \n  return { jsx, css }\n}\n```\n\n**Export UI:**\n- Export 버튼 → 모달 표시\n- 포맷 선택: Inline / Tailwind / CSS Module\n- TypeScript 옵션\n- 다운로드 버튼",
+				"testStrategy": "**테스트 전략:**\n1. 유닛 테스트:\n   - `convertStyleToTailwind`: 다양한 스타일 → Tailwind 클래스\n   - `convertStyleToCSS`: CSSProperties → CSS 문자열\n2. 스냅샷 테스트:\n   - 동일한 컴포넌트를 세 가지 포맷으로 export → 각각 올바른 출력\n3. 통합 테스트:\n   - Tailwind 출력 → Tailwind 프로젝트에서 렌더링 확인\n   - CSS Module 출력 → Next.js/Vite에서 import 및 렌더링 확인",
+				"priority": "low",
+				"dependencies": [9],
+				"status": "pending",
+				"subtasks": []
+			}
+		],
+		"metadata": {
+			"created": "2026-01-27T12:37:06.124Z",
+			"updated": "2026-01-27T12:37:06.124Z",
+			"description": "Tasks for master context"
+		}
+	}
+}

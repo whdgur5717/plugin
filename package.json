@@ -1,6 +1,7 @@
 {
 	"private": true,
 	"type": "module",
+	"packageManager": "pnpm@10.28.0",
 	"scripts": {
 		"dev": "concurrently \"pnpm --filter @design-editor/shell dev\" \"pnpm --filter @design-editor/canvas dev\"",
 		"format": "prettier --write .",

@@ -38,9 +38,15 @@ node_modules/
 .vscode
 # OS specific
 
+.claude
+tsconfig.tsbuildinfo
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # Task files
 # tasks.json
 # tasks/ 
-
-.claude
-tsconfig.tsbuildinfo

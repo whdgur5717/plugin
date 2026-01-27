@@ -1,0 +1,9 @@
+name: "Auto Label PR"
+description: "Automatically label PRs based on changed file paths"
+inputs:
+ github-token:
+  description: "GitHub token for API access"
+  required: true
+runs:
+ using: "node20"
+ main: "index.js"

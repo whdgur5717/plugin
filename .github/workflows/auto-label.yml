@@ -1,0 +1,28 @@
+name: Auto Label PR
+
+on:
+ pull_request:
+  types: [opened, synchronize, reopened]
+
+permissions:
+ contents: read
+ pull-requests: write
+
+jobs:
+ label:
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/checkout@v4
+
+   - uses: pnpm/action-setup@v4
+
+   - uses: actions/setup-node@v4
+     with:
+      node-version: 22
+      cache: "pnpm"
+
+   - run: pnpm install
+
+   - uses: ./.github/actions/auto-label
+     with:
+      github-token: ${{ secrets.GITHUB_TOKEN }}

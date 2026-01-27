@@ -1,0 +1,29 @@
+{
+	"labels": [
+		{
+			"name": "pkg:core",
+			"pattern": "packages/editor-core/**",
+			"color": "0366d6"
+		},
+		{
+			"name": "pkg:components",
+			"pattern": "packages/editor-components/**",
+			"color": "1d76db"
+		},
+		{
+			"name": "pkg:canvas",
+			"pattern": "packages/editor-canvas/**",
+			"color": "5319e7"
+		},
+		{
+			"name": "pkg:shell",
+			"pattern": "packages/editor-shell/**",
+			"color": "0e8a16"
+		},
+		{
+			"name": "pkg:figma-plugin",
+			"pattern": "packages/figma-plugin/**",
+			"color": "d93f0b"
+		}
+	]
+}

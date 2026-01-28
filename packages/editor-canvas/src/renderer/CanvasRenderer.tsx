@@ -1,10 +1,19 @@
 import { getComponent } from "@design-editor/components"
-import type { ComponentDefinition, DocumentNode, InstanceNode, NodeData, Position, Size } from "@design-editor/core"
+import type {
+	ComponentDefinition,
+	ElementNode,
+	InstanceNode,
+	PageNode,
+	Position,
+	SceneNode,
+	Size,
+} from "@design-editor/core"
+import React from "react"
 
 import { NodeWrapper } from "./NodeWrapper"
 
 interface CanvasRendererProps {
-	document: DocumentNode
+	page: PageNode
 	components: ComponentDefinition[]
 	selectedIds: string[]
 	onNodeClick: (id: string, shiftKey: boolean) => void
@@ -14,7 +23,7 @@ interface CanvasRendererProps {
 }
 
 export function CanvasRenderer({
-	document,
+	page,
 	components,
 	selectedIds,
 	onNodeClick,
@@ -23,24 +32,24 @@ export function CanvasRenderer({
 	onNodeResize,
 }: CanvasRendererProps) {
 	return (
-		<NodeWrapper
-			node={document}
-			isSelected={selectedIds.includes(document.id)}
-			onSelect={(shiftKey) => onNodeClick(document.id, shiftKey)}
-			onHover={(hovered) => onNodeHover(hovered ? document.id : null)}
-			onMove={(pos) => onNodeMove(document.id, pos)}
-			onResize={(size) => onNodeResize(document.id, size)}
-		>
-			{renderNode(document, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
-		</NodeWrapper>
+		<>
+			{page.children
+				.filter((child) => child.visible !== false)
+				.map((child) => (
+					<NodeWrapper
+						key={child.id}
+						node={child}
+						isSelected={selectedIds.includes(child.id)}
+						onSelect={(shiftKey) => onNodeClick(child.id, shiftKey)}
+						onHover={(hovered) => onNodeHover(hovered ? child.id : null)}
+						onMove={(pos) => onNodeMove(child.id, pos)}
+						onResize={(size) => onNodeResize(child.id, size)}
+					>
+						{renderNode(child, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
+					</NodeWrapper>
+				))}
+		</>
 	)
-}
-
-/**
- * 인스턴스인지 체크하는 타입 가드
- */
-function isInstance(node: NodeData): node is InstanceNode {
-	return node.type === "__INSTANCE__"
 }
 
 /**
@@ -62,7 +71,7 @@ function renderInstance(
 	}
 
 	// 컴포넌트 루트에 인스턴스 스타일 적용
-	const mergedRoot: NodeData = {
+	const mergedRoot: ElementNode = {
 		...component.root,
 		style: { ...component.root.style, ...instance.style },
 	}
@@ -76,7 +85,7 @@ function renderInstance(
 /**
  * 오버라이드 적용
  */
-function applyOverrides(node: NodeData, overrides?: InstanceNode["overrides"]): NodeData {
+function applyOverrides(node: ElementNode, overrides?: InstanceNode["overrides"]): ElementNode {
 	if (!overrides) return node
 
 	const nodeOverride = overrides[node.id]
@@ -95,7 +104,10 @@ function applyOverrides(node: NodeData, overrides?: InstanceNode["overrides"]): 
 	if (Array.isArray(result.children)) {
 		result = {
 			...result,
-			children: result.children.map((child) => applyOverrides(child, overrides)),
+			children: result.children.map((child) => {
+				if (child.type === "instance") return child
+				return applyOverrides(child, overrides)
+			}),
 		}
 	}
 
@@ -103,7 +115,7 @@ function applyOverrides(node: NodeData, overrides?: InstanceNode["overrides"]): 
 }
 
 function renderNode(
-	node: NodeData,
+	node: SceneNode,
 	components: ComponentDefinition[],
 	selectedIds: string[],
 	onNodeClick: (id: string, shiftKey: boolean) => void,
@@ -112,11 +124,11 @@ function renderNode(
 	onNodeResize: (id: string, size: Size) => void,
 ): React.ReactNode {
 	// 인스턴스인 경우 컴포넌트 참조하여 렌더링
-	if (isInstance(node)) {
+	if (node.type === "instance") {
 		return renderInstance(node, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)
 	}
 
-	const Component = getComponent(node.type)
+	const Component = getComponent(node.tag)
 
 	// position 스타일은 NodeWrapper에서 적용하므로 컴포넌트에서는 제외
 	// width/height도 wrapper에 적용되므로 100%로 채움
@@ -125,11 +137,11 @@ function renderNode(
 	const contentStyle = { ...restStyle, width: "100%", height: "100%" }
 
 	if (!Component) {
-		// 컴포넌트가 없으면 기본 div로 렌더링
-		return (
-			<div style={contentStyle}>
-				{renderChildren(node.children, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize)}
-			</div>
+		// 컴포넌트가 없으면 HTML 태그로 렌더링
+		return React.createElement(
+			node.tag,
+			{ style: contentStyle, ...node.props },
+			renderChildren(node.children, components, selectedIds, onNodeClick, onNodeHover, onNodeMove, onNodeResize),
 		)
 	}
 
@@ -141,7 +153,7 @@ function renderNode(
 }
 
 function renderChildren(
-	children: NodeData["children"],
+	children: ElementNode["children"],
 	components: ComponentDefinition[],
 	selectedIds: string[],
 	onNodeClick: (id: string, shiftKey: boolean) => void,

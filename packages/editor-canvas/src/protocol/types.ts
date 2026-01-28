@@ -11,6 +11,7 @@ export interface CanvasMethods {
 	/** 전체 상태 동기화 */
 	syncState: (state: {
 		document: DocumentNode
+		currentPageId: string
 		components: ComponentDefinition[]
 		zoom: number
 		selection: string[]

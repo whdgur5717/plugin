@@ -1,12 +1,12 @@
 import "./NodeWrapper.css"
 
-import type { NodeData, Position, Size } from "@design-editor/core"
+import type { Position, SceneNode, Size } from "@design-editor/core"
 import { toNumber } from "es-toolkit/compat"
 import { Resizable } from "re-resizable"
 import { type ReactNode, useRef, useState } from "react"
 
 interface NodeWrapperProps {
-	node: NodeData
+	node: SceneNode
 	isSelected: boolean
 	onSelect: (shiftKey: boolean) => void
 	onHover: (hovered: boolean) => void

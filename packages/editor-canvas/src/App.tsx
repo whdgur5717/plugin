@@ -1,7 +1,7 @@
 import "./App.css"
 import "@design-editor/components"
 
-import type { ComponentDefinition, DocumentNode, Position, Size } from "@design-editor/core"
+import type { ComponentDefinition, DocumentNode, PageNode, Position, Size } from "@design-editor/core"
 import { type AsyncMethodReturns, connectToParent } from "penpal"
 import { useEffect, useRef, useState } from "react"
 
@@ -9,7 +9,7 @@ import type { ShellMethods } from "./protocol/types"
 import { CanvasRenderer } from "./renderer/CanvasRenderer"
 
 export function App() {
-	const [document, setDocument] = useState<DocumentNode | null>(null)
+	const [currentPage, setCurrentPage] = useState<PageNode | null>(null)
 	const [components, setComponents] = useState<ComponentDefinition[]>([])
 	const [selectedIds, setSelectedIds] = useState<string[]>([])
 	const [zoom, setZoom] = useState(1)
@@ -18,8 +18,15 @@ export function App() {
 	useEffect(() => {
 		const connection = connectToParent<ShellMethods>({
 			methods: {
-				syncState(state: { document: DocumentNode; components: ComponentDefinition[]; zoom: number; selection: string[] }) {
-					setDocument(state.document)
+				syncState(state: {
+					document: DocumentNode
+					currentPageId: string
+					components: ComponentDefinition[]
+					zoom: number
+					selection: string[]
+				}) {
+					const page = state.document.children.find((p) => p.id === state.currentPageId)
+					setCurrentPage(page ?? null)
 					setComponents(state.components)
 					setZoom(state.zoom)
 					setSelectedIds(state.selection)
@@ -52,14 +59,14 @@ export function App() {
 		parentMethodsRef.current?.onNodeResized(id, size)
 	}
 
-	if (!document) {
+	if (!currentPage) {
 		return <div className="loading">Loading...</div>
 	}
 
 	return (
 		<div className="canvas-app" style={{ transform: `scale(${zoom})` }}>
 			<CanvasRenderer
-				document={document}
+				page={currentPage}
 				components={components}
 				selectedIds={selectedIds}
 				onNodeClick={handleNodeClick}

@@ -1,22 +1,26 @@
 {
 	"private": true,
 	"type": "module",
+	"packageManager": "pnpm@10.28.0",
 	"scripts": {
 		"dev": "concurrently \"pnpm --filter @design-editor/shell dev\" \"pnpm --filter @design-editor/canvas dev\"",
 		"format": "prettier --write .",
 		"lint": "pnpm -r run lint -- .",
 		"type-check": "pnpm -r run type-check",
-		"prepare": "husky"
+		"prepare": "husky",
+		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
 		"@actions/core": "^1.11.1",
 		"@actions/github": "^6.0.0",
+		"@playwright/test": "^1.50.1",
+		"@types/node": "^25.0.10",
 		"@typescript/native-preview": "^7.0.0-dev.20260124.1",
 		"concurrently": "^9.2.1",
-		"minimatch": "^10.0.1",
 		"eslint": "^9.39.2",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.2.7",
+		"minimatch": "^10.0.1",
 		"prettier": "latest",
 		"typescript": "~5.6.2",
 		"vitest": "^4.0.0"

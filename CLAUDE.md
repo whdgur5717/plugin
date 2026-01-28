@@ -33,7 +33,7 @@ This is a **DOM/React-based design editor**. The editor renders React components
 
 ```
 packages/
-├── editor-core/        # Shared types (NodeData, EditorState) & codegen
+├── editor-core/        # Shared types (SceneNode, EditorState) & codegen
 ├── editor-components/  # Component registry (maps node types → React components)
 ├── editor-canvas/      # Canvas iframe app (Vite, port 3001) - renders nodes
 ├── editor-shell/       # Main shell app (Vite, port 3000) - toolbar, panels, state
@@ -53,17 +53,44 @@ Shell and Canvas run as separate Vite apps connected via **Penpal** (postMessage
 
 ### Core Data Model
 
-`NodeData` (in `editor-core/src/types/node.ts`) is the source of truth:
+Node types are defined in `editor-core/src/types/node.ts`:
 
 ```typescript
-interface NodeData {
+// 공통 필드
+interface BaseNode {
 	id: string
-	type: string // Component type: 'Frame', 'Text', 'Flex', etc.
-	props?: Record<string, unknown>
 	style?: CSSProperties
-	children?: NodeData[] | string
 	visible?: boolean
 	locked?: boolean
+}
+
+// HTML 요소 노드
+interface ElementNode extends BaseNode {
+	type: "element"
+	tag: string // HTML tag: 'div', 'span', etc.
+	props?: Record<string, unknown>
+	children?: SceneNode[] | string
+}
+
+// 컴포넌트 인스턴스 노드
+interface InstanceNode extends BaseNode {
+	type: "instance"
+	componentId: string
+	overrides?: { [nodeId: string]: { props?; style?; children? } }
+}
+
+// 페이지 내 모든 노드의 union
+type SceneNode = ElementNode | InstanceNode
+
+// 문서 구조: Document → Page[] → SceneNode[]
+interface DocumentNode {
+	id: string
+	children: PageNode[]
+}
+interface PageNode {
+	id: string
+	name: string
+	children: SceneNode[]
 }
 ```
 
@@ -85,7 +112,7 @@ Zustand store in `editor-shell/src/store/editor.ts` manages:
 
 ### Codegen
 
-`editor-core/src/codegen/serialize.ts` converts NodeData → JSX code for export.
+`editor-core/src/codegen/serialize.ts` converts SceneNode → JSX code for export.
 
 ## Key Libraries
 

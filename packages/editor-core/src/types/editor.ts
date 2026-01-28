@@ -1,4 +1,4 @@
-import type { ComponentDefinition, DocumentNode, NodeData, Position, Size } from "./node"
+import type { ComponentDefinition, DocumentNode, ElementNode, Position, SceneNode, Size } from "./node"
 
 /**
  * 에디터 도구 타입
@@ -11,6 +11,9 @@ export type EditorTool = "select" | "frame" | "text" | "shape"
 export interface EditorState {
 	/** 현재 문서 */
 	document: DocumentNode
+
+	/** 현재 페이지 ID */
+	currentPageId: string
 
 	/** 컴포넌트 정의 목록 */
 	components: ComponentDefinition[]
@@ -33,10 +36,10 @@ export interface EditorState {
  */
 export interface EditorActions {
 	/** 노드 업데이트 */
-	updateNode: (id: string, updates: Partial<NodeData>) => void
+	updateNode: (id: string, updates: Partial<SceneNode>) => void
 
 	/** 노드 추가 */
-	addNode: (parentId: string, node: NodeData, index?: number) => void
+	addNode: (parentId: string, node: SceneNode, index?: number) => void
 
 	/** 노드 삭제 */
 	removeNode: (id: string) => void
@@ -81,7 +84,7 @@ export interface EditorActions {
 	createInstance: (componentId: string, parentId: string) => string | null
 
 	/** 컴포넌트 정의 업데이트 (마스터 변경) */
-	updateComponent: (componentId: string, updates: Partial<NodeData>) => void
+	updateComponent: (componentId: string, updates: Partial<ElementNode>) => void
 
 	/** 컴포넌트 삭제 */
 	deleteComponent: (componentId: string) => void
@@ -95,6 +98,18 @@ export interface EditorActions {
 
 	/** 인스턴스 오버라이드 리셋 */
 	resetInstanceOverrides: (instanceId: string) => void
+
+	/** 페이지 변경 */
+	setCurrentPage: (pageId: string) => void
+
+	/** 페이지 추가 */
+	addPage: (name: string) => string
+
+	/** 페이지 삭제 */
+	removePage: (pageId: string) => void
+
+	/** 페이지 이름 변경 */
+	renamePage: (pageId: string, name: string) => void
 }
 
 /**
